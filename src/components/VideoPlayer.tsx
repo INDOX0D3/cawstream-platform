@@ -260,6 +260,8 @@ export function VideoPlayer({
 
   // Auto-enter fullscreen on load; browsers require a gesture, so retry on the
   // first interaction inside the player if the initial request was blocked.
+  // On iOS Safari (no element fullscreen) this falls back to the native video
+  // fullscreen, so tapping play fills the screen too.
   useEffect(() => {
     if (!autoFullscreen || !isReady) return;
     const container = containerRef.current;
@@ -267,14 +269,25 @@ export function VideoPlayer({
 
     const enter = () => {
       if (autoFullscreenDone.current || userLeftFullscreen.current) return;
-      if (document.fullscreenElement) return;
       autoFullscreenDone.current = true;
+      const doc = document as Document & { webkitFullscreenElement?: Element };
+      if (document.fullscreenElement || doc.webkitFullscreenElement) return;
+      const videoEl = videoRef.current;
       if (container.requestFullscreen) {
         container.requestFullscreen().catch(() => {
           autoFullscreenDone.current = false; // blocked — wait for a gesture
         });
       } else if ("webkitRequestFullscreen" in container) {
         (container as unknown as { webkitRequestFullscreen: () => void }).webkitRequestFullscreen();
+      } else if (videoEl && "webkitEnterFullscreen" in videoEl) {
+        // iOS Safari: fullscreen the <video> element directly.
+        try {
+          (videoEl as unknown as { webkitEnterFullscreen: () => void }).webkitEnterFullscreen();
+        } catch {
+          autoFullscreenDone.current = false;
+        }
+      } else {
+        autoFullscreenDone.current = false; // unsupported — give up quietly
       }
     };
     const onGesture = () => enter();

@@ -149,7 +149,7 @@ function VideoDetailDialog({
   const [description, setDescription] = useState(video.description ?? "");
   const [saving, setSaving] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  const [autoFullEmbed, setAutoFullEmbed] = useState(false);
+  const [autoFullEmbed, setAutoFullEmbed] = useState(true); // embeds are fullscreen by default
 
   const urls = videoUrls(video.publicId);
   const embed = embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed });

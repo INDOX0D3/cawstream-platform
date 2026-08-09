@@ -17,7 +17,7 @@ import { Link, useParams } from "react-router";
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
-  const [autoFullEmbed, setAutoFullEmbed] = useState(false);
+  const [autoFullEmbed, setAutoFullEmbed] = useState(true); // embeds are fullscreen by default
   const payload = useQuery(api.videos.getWatch, { publicId });
   const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(

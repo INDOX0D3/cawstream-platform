@@ -4,10 +4,19 @@ import { useQuery } from "convex/react";
 import { Loader2, PlayCircle } from "lucide-react";
 import { useParams } from "react-router";
 
-/** Minimal chrome-free embed surface used by the iframe embed code. */
+/**
+ * Minimal chrome-free embed surface used by the iframe embed code.
+ *
+ * Fullscreen by default: the player goes fullscreen as soon as the page is
+ * opened — no need to click the fullscreen button. Browsers only allow
+ * fullscreen after a user gesture, so the player also enters fullscreen on
+ * the very first tap/click (including pressing play). Append ?autofull=0 to
+ * the embed URL to opt out of auto-fullscreen.
+ */
 export default function Embed() {
   const { publicId = "" } = useParams();
-  const autoFullscreen = new URLSearchParams(window.location.search).get("autofull") === "1";
+  const autofull = new URLSearchParams(window.location.search).get("autofull");
+  const autoFullscreen = autofull !== "0";
   const payload = useQuery(api.videos.getEmbed, { publicId });
 
   if (payload === undefined) {

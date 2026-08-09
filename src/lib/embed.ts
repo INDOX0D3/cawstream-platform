@@ -16,7 +16,8 @@ export function embedCode(
   opts?: { autoFullscreen?: boolean },
 ): string {
   const { embed } = videoUrls(publicId);
-  const src = opts?.autoFullscreen ? `${embed}?autofull=1` : embed;
+  // Embeds open in fullscreen by default — append ?autofull=0 to opt out.
+  const src = opts?.autoFullscreen === false ? `${embed}?autofull=0` : embed;
   return [
     `<iframe`,
     `    src="${src}"`,
