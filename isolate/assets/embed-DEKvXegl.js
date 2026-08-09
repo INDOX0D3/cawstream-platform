@@ -1,0 +1,2 @@
+function t(e){const o=typeof window<"u"?window.location.origin:"";return{mp4:`${o}/video/${e}.mp4`,thumb:`${o}/thumb/${e}.jpg`,embed:`${o}/e/${e}`,watch:`${o}/v/${e}`}}function l(e,o=500,r){const{embed:n}=t(e);return["<iframe",`    src="${r?.autoFullscreen?`${n}?autofull=1`:n}"`,'    width="100%"',`    height="${o}"`,'    frameborder="0"','    scrolling="no"','    allow="autoplay; fullscreen; picture-in-picture"',"    allowfullscreen>","</iframe>"].join(`
+`)}export{l as e,t as v};

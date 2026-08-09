@@ -1,2 +1,0 @@
-function r(e){const n=typeof window<"u"?window.location.origin:"";return{mp4:`${n}/video/${e}.mp4`,thumb:`${n}/thumb/${e}.jpg`,embed:`${n}/e/${e}`,watch:`${n}/v/${e}`}}function i(e,n=500){const{embed:o}=r(e);return["<iframe",`    src="${o}"`,'    width="100%"',`    height="${n}"`,'    frameborder="0"','    scrolling="no"','    allow="autoplay; fullscreen; picture-in-picture"',"    allowfullscreen>","</iframe>"].join(`
-`)}export{i as e,r as v};
