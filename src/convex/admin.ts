@@ -5,7 +5,7 @@ import { normalizeUser, requireAdmin } from "./users";
 import { getProcessingBackend } from "./processor";
 import { getJobForVideo } from "./jobs";
 import { storageService } from "./lib/storage";
-import { accountStatusValidator } from "./schema";
+import { accountStatusValidator, roleValidator } from "./schema";
 
 type WriteCtx = { db: MutationCtx["db"] };
 
@@ -109,6 +109,28 @@ export const setUserStatus = mutation({
     }
     await ctx.db.patch(userId, { status });
     await logEvent(ctx, "warning", "admin", `User ${user.email ?? userId} was ${status}.`);
+  },
+});
+
+export const setUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    role: roleValidator,
+  },
+  handler: async (ctx, { userId, role }) => {
+    const admin = await requireAdmin(ctx);
+    if (admin._id === userId) {
+      throw new Error("You cannot change your own role here.");
+    }
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found.");
+    await ctx.db.patch(userId, { role });
+    await logEvent(
+      ctx,
+      "warning",
+      "admin",
+      `Role for ${user.email ?? userId} set to ${role}.`,
+    );
   },
 });
 

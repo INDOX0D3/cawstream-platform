@@ -82,12 +82,33 @@ export const currentUser = query({
  * Called by the sign-up UI immediately after the auth signUp flow resolves.
  * Validates the chosen username server-side and enforces uniqueness (the
  * auth `profile` callback is synchronous and cannot touch the database).
+ *
+ * Role/status bootstrap runs FIRST so a username that fails validation can
+ * never leave the first account without its admin role (that bug caused
+ * "registered first but role is user" accounts).
  */
 export const completeSignup = mutation({
   args: { username: v.optional(v.string()) },
   handler: async (ctx, { username }) => {
     const user = await requireUser(ctx);
     const patch: Record<string, unknown> = {};
+
+    // 1) Role + status bootstrap — independent of the username claim.
+    if (user.role === undefined) {
+      // First account to sign up becomes the administrator (this stack's
+      // equivalent of the web installer's "create administrator" step).
+      const existingAdmin = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "admin"))
+        .first();
+      patch.role = existingAdmin ? ROLES.USER : ROLES.ADMIN;
+    }
+    if (user.status === undefined) patch.status = "active";
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(user._id, patch);
+    }
+
+    // 2) Username claim (may throw — the account keeps its role/status).
     if (username !== undefined && username.trim()) {
       const trimmed = username.trim();
       if (!/^[a-zA-Z0-9_]{3,24}$/.test(trimmed)) {
@@ -102,25 +123,64 @@ export const completeSignup = mutation({
       if (taken && taken._id !== user._id) {
         throw new Error("That username is already taken.");
       }
-      patch.username = trimmed;
-      patch.name = user.name ?? trimmed;
+      await ctx.db.patch(user._id, { username: trimmed, name: user.name ?? trimmed });
     }
-    if (user.role === undefined) {
-      // First account to sign up becomes the administrator (this stack's
-      // equivalent of the web installer's "create administrator" step).
-      const existingAdmin = await ctx.db
-        .query("users")
-        .filter((q) => q.eq(q.field("role"), "admin"))
-        .first();
-      patch.role = existingAdmin ? ROLES.USER : ROLES.ADMIN;
+
+    const updated = await ctx.db.get(user._id);
+    if (!updated) throw new Error("User not found.");
+    return normalizeUser(updated);
+  },
+});
+
+/**
+ * First-administrator rescue. Promotes the caller ONLY when this installation
+ * has no administrator at all — the equivalent of re-running the installer's
+ * "create administrator" step for a first account whose bootstrap never ran.
+ * Safe by construction: it can never demote or steal from an existing admin.
+ */
+export const bootstrapAdmin = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+    if (!user.emailVerificationTime) {
+      throw new Error("Verify your email first, then you can claim administrator access.");
     }
-    if (user.status === undefined) patch.status = "active";
-    if (Object.keys(patch).length > 0) {
-      await ctx.db.patch(user._id, patch);
+    const existingAdmin = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .first();
+    if (existingAdmin && existingAdmin._id !== user._id) {
+      throw new Error("An administrator already exists on this installation.");
+    }
+    if (user.role === ROLES.ADMIN) {
+      return normalizeUser(user);
+    }
+    await ctx.db.patch(user._id, { role: ROLES.ADMIN });
+    try {
+      await ctx.db.insert("systemLogs", {
+        level: "info",
+        source: "admin",
+        message: `Administrator access claimed by ${user.email ?? user._id}.`,
+        createdAt: Date.now(),
+      });
+    } catch {
+      // logging must never block the promotion
     }
     const updated = await ctx.db.get(user._id);
     if (!updated) throw new Error("User not found.");
     return normalizeUser(updated);
+  },
+});
+
+/** Whether any administrator exists (powers the claim-admin rescue screen). */
+export const adminStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const admin = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .first();
+    return { hasAdmin: admin !== null };
   },
 });
 
