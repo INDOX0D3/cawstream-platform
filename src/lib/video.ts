@@ -126,11 +126,50 @@ export function extractMetadata(file: File): Promise<VideoMetadata> {
   });
 }
 
-/** Capture a real frame from the file as a JPEG blob (used as the thumbnail). */
+/** Draw a play-button overlay onto a captured frame (the “cloaked” look used
+ *  for social previews: thumbnail with a play logo so it reads as a video). */
+function drawPlayOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): void {
+  // Subtle dark scrim so the play button pops on bright frames.
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.fillRect(0, 0, width, height);
+
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) * 0.17;
+
+  // Circle badge.
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fill();
+  ctx.lineWidth = Math.max(2, radius * 0.08);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.stroke();
+
+  // Play triangle, nudged right so it looks optically centered.
+  const triHeight = radius * 1.05;
+  const triHalf = triHeight / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - triHalf * 0.55, cy - triHalf);
+  ctx.lineTo(cx - triHalf * 0.55, cy + triHalf);
+  ctx.lineTo(cx + triHeight * 0.62, cy);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+}
+
+/** Capture a real frame from the file as a JPEG blob (used as the thumbnail).
+ *  Pass `overlayPlay = true` to composite a play-button badge onto the frame
+ *  (the social-preview poster). */
 export function generateThumbnail(
   file: File,
   seekToSeconds = 1,
   maxWidth = 640,
+  overlayPlay = false,
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -163,6 +202,7 @@ export function generateThumbnail(
         return;
       }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (overlayPlay) drawPlayOverlay(ctx, canvas.width, canvas.height);
       cleanup();
       canvas.toBlob(
         (blob) => {
@@ -185,6 +225,12 @@ export function generateThumbnail(
     };
     video.src = url;
   });
+}
+
+/** High-res thumbnail composited with a play-button overlay — used as the
+ *  og:image / poster so pasted links preview as videos on X, WhatsApp, FB, etc. */
+export function generateSocialThumbnail(file: File): Promise<Blob> {
+  return generateThumbnail(file, 1, 1280, true);
 }
 
 export interface UploadProgress {

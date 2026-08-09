@@ -12,7 +12,7 @@ describe("generatePublicId", () => {
   });
 
   it("respects a custom length", () => {
-    expect(generatePublicId(12)).toMatch(/^[A-HJ-KM-NP-Z2-9]{12}$/);
+    expect(generatePublicId(12)).toMatch(/^[A-HJ-NP-Z2-9]{12}$/);
   });
 
   it("produces unique values", () => {

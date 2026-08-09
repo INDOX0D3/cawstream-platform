@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCompact, formatDuration, formatRelative } from "@/lib/format";
-import { Eye, Play } from "lucide-react";
+import { Eye, Pencil, Play } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,15 @@ export function VideoCard({
   to,
   showOwner,
   ownerName,
+  onEdit,
 }: {
   video: VideoCardVideo;
   to: string;
   showOwner?: boolean;
   ownerName?: string;
+  /** Optional edit action — renders a pencil button on hover (e.g. to rename
+   *  the video from My Videos without leaving the grid). */
+  onEdit?: () => void;
 }) {
   const isReady = video.status === "ready";
 
@@ -53,6 +57,20 @@ export function VideoCard({
               <Play className="ml-0.5 size-5" />
             </span>
           </span>
+        )}
+        {onEdit && (
+          <button
+            type="button"
+            aria-label="Edit video details"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 shadow backdrop-blur-sm transition-opacity hover:bg-black/80 group-hover:opacity-100"
+          >
+            <Pencil className="size-3.5" />
+          </button>
         )}
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 p-2">
           {video.duration && isReady ? (

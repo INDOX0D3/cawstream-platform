@@ -43,9 +43,17 @@ export const prepareUpload = mutation({
     fileName: v.string(),
     mimeType: v.string(),
     sizeBytes: v.number(),
+    title: v.string(),
   },
-  handler: async (ctx, { fileName, mimeType, sizeBytes }) => {
+  handler: async (ctx, { fileName, mimeType, sizeBytes, title }) => {
     const user = await requireUser(ctx);
+
+    // A title is mandatory — it powers the watch page, embed titles and the
+    // social preview cards.
+    const safeTitle = sanitizeTitle(title);
+    if (!title.trim()) {
+      throw new Error("Please enter a title before uploading.");
+    }
 
     if (!isAllowedVideoMime(mimeType)) {
       throw new Error("Unsupported file type. Use MP4, MOV, MKV or WEBM.");
@@ -77,7 +85,7 @@ export const prepareUpload = mutation({
     const videoId = await ctx.db.insert("videos", {
       ownerId: user._id,
       publicId,
-      title: sanitizeTitle(safeName.replace(/\.[^.]+$/, "")),
+      title: safeTitle,
       description: "",
       fileName: safeName,
       mimeType,
@@ -89,7 +97,7 @@ export const prepareUpload = mutation({
     await createJob(ctx, videoId, backend);
 
     if (backend === "mux") {
-      const { uploadUrl, uploadId } = await createMuxDirectUpload(safeName);
+      const { uploadUrl, uploadId } = await createMuxDirectUpload(safeTitle);
       await markJobProcessing(ctx, videoId);
       await ctx.db.patch(videoId, { status: "processing", processingStartedAt: Date.now() });
       return { videoId, publicId, backend, uploadUrl, muxUploadId: uploadId };
@@ -141,6 +149,7 @@ export const completeProcessing = mutation({
   args: {
     videoId: v.id("videos"),
     thumbnailStorageId: v.optional(v.id("_storage")),
+    socialThumbnailStorageId: v.optional(v.id("_storage")),
     duration: v.optional(v.number()),
     width: v.optional(v.number()),
     height: v.optional(v.number()),
@@ -156,6 +165,7 @@ export const completeProcessing = mutation({
     }
     await ctx.db.patch(args.videoId, {
       thumbnailStorageId: args.thumbnailStorageId ?? undefined,
+      socialThumbnailStorageId: args.socialThumbnailStorageId ?? undefined,
       duration: args.duration,
       width: args.width,
       height: args.height,
@@ -168,6 +178,24 @@ export const completeProcessing = mutation({
     });
     await markJobCompleted(ctx, args.videoId);
     await logEvent(ctx, "info", "processing", `Video ${video.publicId} is ready.`);
+  },
+});
+
+/** Record the social-preview thumbnail (thumbnail + play-button overlay).
+ *  Used by the Mux pipeline where the video is marked ready by the cloud
+ *  transcode and the client only attaches the poster afterwards. */
+export const attachSocialThumbnail = mutation({
+  args: {
+    videoId: v.id("videos"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, { videoId, storageId }) => {
+    const user = await requireUser(ctx);
+    const video = await ctx.db.get(videoId);
+    if (!video || video.ownerId !== user._id) {
+      throw new Error("Video not found.");
+    }
+    await ctx.db.patch(videoId, { socialThumbnailStorageId: storageId });
   },
 });
 
@@ -254,7 +282,10 @@ export const updateVideo = mutation({
       throw new Error("Video not found.");
     }
     const patch: Record<string, unknown> = {};
-    if (title !== undefined) patch.title = sanitizeTitle(title);
+    if (title !== undefined) {
+      if (!title.trim()) throw new Error("Title cannot be empty.");
+      patch.title = sanitizeTitle(title);
+    }
     if (description !== undefined) patch.description = sanitizeDescription(description);
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(videoId, patch);
@@ -406,6 +437,9 @@ async function buildEmbedPayload(ctx: MediaCtx, video: VideoDoc) {
   const thumbnailUrl = video.thumbnailStorageId
     ? await ctx.storage.getUrl(video.thumbnailStorageId)
     : video.thumbnailUrl ?? null;
+  const posterUrl = video.socialThumbnailStorageId
+    ? await ctx.storage.getUrl(video.socialThumbnailStorageId)
+    : thumbnailUrl;
 
   const player = (await getSetting(ctx, "player", DEFAULT_PLAYER_SETTINGS)) as PlayerSettings;
   const branding = (await getSetting(ctx, "branding", DEFAULT_BRANDING)) as BrandingSettings;
@@ -430,13 +464,14 @@ async function buildEmbedPayload(ctx: MediaCtx, video: VideoDoc) {
       muxPlaybackId: video.muxPlaybackId ?? null,
       directUrl,
       thumbnailUrl,
+      posterUrl,
       views: video.views,
       createdAt: video._creationTime,
     },
     ads,
     player,
     branding,
-    site: { name: site.name, supportEmail: site.supportEmail },
+    site: { name: site.name, supportEmail: site.supportEmail, siteUrl: site.siteUrl },
   };
 }
 
@@ -561,6 +596,28 @@ export const resolveThumb = query({
       .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
       .first();
     if (!video || video.archivedAt) return null;
+    if (video.thumbnailStorageId) {
+      return await ctx.storage.getUrl(video.thumbnailStorageId);
+    }
+    return video.thumbnailUrl ?? null;
+  },
+});
+
+/** HTTP action helper: resolve the social-preview poster (thumbnail with the
+ *  play-button overlay) for /poster/{publicId}.jpg. Falls back to the regular
+ *  thumbnail so old videos still preview. */
+export const resolvePoster = query({
+  args: { publicId: v.string() },
+  handler: async (ctx, { publicId }) => {
+    const video = await ctx.db
+      .query("videos")
+      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
+      .first();
+    if (!video || video.archivedAt) return null;
+    if (video.socialThumbnailStorageId) {
+      const url = await ctx.storage.getUrl(video.socialThumbnailStorageId);
+      if (url) return url;
+    }
     if (video.thumbnailStorageId) {
       return await ctx.storage.getUrl(video.thumbnailStorageId);
     }

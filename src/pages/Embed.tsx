@@ -1,7 +1,9 @@
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
+import { applyVideoMeta } from "@/lib/seo";
 import { useQuery } from "convex/react";
 import { Loader2, PlayCircle } from "lucide-react";
+import { useEffect } from "react";
 import { useParams } from "react-router";
 
 /**
@@ -19,6 +21,20 @@ export default function Embed() {
   const autofull = new URLSearchParams(window.location.search).get("autofull");
   const autoFullscreen = autofull !== "0";
   const payload = useQuery(api.videos.getEmbed, { publicId });
+
+  // The embed URL is often pasted into chats — keep the document head in sync
+  // so JS-rendering crawlers and browsers show a proper video preview.
+  useEffect(() => {
+    if (!payload) return;
+    const origin = window.location.origin;
+    applyVideoMeta({
+      title: `${payload.video.title} — ${payload.site.name}`,
+      description: `Watch "${payload.video.title}" on ${payload.site.name}.`,
+      imageUrl: payload.video.posterUrl ?? `${origin}/thumb/${payload.video.publicId}.jpg`,
+      url: window.location.href,
+      siteName: payload.site.name,
+    });
+  }, [payload, publicId]);
 
   if (payload === undefined) {
     return (

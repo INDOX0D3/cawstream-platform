@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import { videoUrls } from "@/lib/embed";
 import { formatBytes } from "@/lib/format";
 import {
   detectVideoType,
   extractMetadata,
+  generateSocialThumbnail,
   generateThumbnail,
   uploadBlob,
   validateVideoFile,
@@ -83,7 +85,9 @@ export default function Upload() {
   const checkMuxUpload = useMutation(api.processor.checkMuxUpload);
   const cancelUpload = useMutation(api.videos.cancelUpload);
   const markFailed = useMutation(api.videos.markFailed);
+  const attachSocialThumb = useMutation(api.videos.attachSocialThumbnail);
 
+  const [title, setTitle] = useState("");
   const [run, setRun] = useState<RunState | null>(null);
   const [dragging, setDragging] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -95,6 +99,11 @@ export default function Upload() {
   const start = useCallback(
     async (file: File) => {
       if (!file || run) return;
+
+      if (!title.trim()) {
+        toast.error("Please enter a title for your video first.");
+        return;
+      }
 
       const checked = validateVideoFile(file);
       if (!checked.ok) {
@@ -126,6 +135,7 @@ export default function Upload() {
           fileName: file.name,
           mimeType: detected,
           sizeBytes: file.size,
+          title,
         });
         videoIdRef.current = prepared.videoId;
 
@@ -134,6 +144,8 @@ export default function Upload() {
           setRun((r) =>
             r ? { ...r, phase: "uploading", backend: "mux", detail: "Uploading to Mux…" } : r,
           );
+          // The play-button poster is captured locally while the upload runs.
+          const socialThumbPromise = generateSocialThumbnail(file).catch(() => null);
           await putBlob(prepared.uploadUrl, file, (p) => {
             setRun((r) => (r ? { ...r, progress: p.percent } : r));
           }, active.signal);
@@ -166,6 +178,16 @@ export default function Upload() {
             await markFailed({ videoId: prepared.videoId, error: "Timed out waiting for Mux." });
             throw new Error("Mux transcoding timed out. Try uploading again.");
           }
+          const socialThumb = await socialThumbPromise;
+          if (socialThumb) {
+            try {
+              const socialUrl = await getUploadUrl();
+              const socialId = (await uploadBlob(socialUrl, socialThumb)) as Id<"_storage">;
+              await attachSocialThumb({ videoId: prepared.videoId, storageId: socialId });
+            } catch {
+              // the poster is optional — the video still previews with its regular thumb
+            }
+          }
           setRun((r) =>
             r
               ? { ...r, phase: "done", detail: "Ready", publicId: prepared.publicId }
@@ -185,9 +207,10 @@ export default function Upload() {
         setRun((r) =>
           r ? { ...r, detail: "Reading metadata and capturing a thumbnail…" } : r,
         );
-        const [meta, thumb] = await Promise.all([
+        const [meta, thumb, socialThumb] = await Promise.all([
           extractMetadata(file),
           generateThumbnail(file),
+          generateSocialThumbnail(file).catch(() => null),
         ]);
 
         const storageId = (await uploadPromise) as Id<"_storage">;
@@ -210,10 +233,20 @@ export default function Upload() {
         } catch {
           // thumbnail is optional
         }
+        let socialThumbnailStorageId: Id<"_storage"> | undefined;
+        if (socialThumb) {
+          try {
+            const socialUrl = await getUploadUrl();
+            socialThumbnailStorageId = (await uploadBlob(socialUrl, socialThumb)) as Id<"_storage">;
+          } catch {
+            // the play-button poster is optional
+          }
+        }
 
         await completeProcessing({
           videoId: prepared.videoId,
           thumbnailStorageId,
+          socialThumbnailStorageId,
           duration: meta.duration,
           width: meta.width,
           height: meta.height,
@@ -238,6 +271,7 @@ export default function Upload() {
     },
     [
       run,
+      title,
       maxBytes,
       prepareUpload,
       putBlob,
@@ -246,9 +280,11 @@ export default function Upload() {
       uploadBlob,
       extractMetadata,
       generateThumbnail,
+      generateSocialThumbnail,
       finalizeUpload,
       getUploadUrl,
       completeProcessing,
+      attachSocialThumb,
     ],
   );
 
@@ -293,10 +329,23 @@ export default function Upload() {
         </CardHeader>
         <CardContent>
           {run === null ? (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => inputRef.current?.click()}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="videoTitle" className="text-sm font-medium">
+                  Video title <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="videoTitle"
+                  placeholder="Give your video a title…"
+                  value={title}
+                  maxLength={120}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => inputRef.current?.click()}
               onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -325,17 +374,18 @@ export default function Upload() {
                   MP4, MOV, MKV or WEBM · up to {Math.round(maxBytes / 1024 / 1024)} MB
                 </p>
               </div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void start(file);
-                  e.target.value = "";
-                }}
-              />
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void start(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
             </div>
           ) : run.phase === "done" ? (
             <div className="flex flex-col items-center gap-3 py-8 text-center">

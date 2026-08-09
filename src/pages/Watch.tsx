@@ -6,12 +6,13 @@ import { Switch } from "@/components/ui/switch";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { embedCode } from "@/lib/embed";
+import { embedCode, socialPreviewUrl } from "@/lib/embed";
 import { formatCompact, formatDate } from "@/lib/format";
+import { applyVideoMeta } from "@/lib/seo";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
-import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, UserRound } from "lucide-react";
-import { useState } from "react";
+import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, Sparkles, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 export default function Watch() {
@@ -33,6 +34,20 @@ export default function Watch() {
         showWatermark: personal.showWatermark,
       }
     : undefined;
+
+  // Keep the document head in sync so the page previews correctly in
+  // browsers and JS-rendering crawlers (Google, Facebook, X, Discord…).
+  useEffect(() => {
+    if (!payload) return;
+    const origin = window.location.origin;
+    applyVideoMeta({
+      title: `${payload.video.title} — ${payload.site.name}`,
+      description: `Watch "${payload.video.title}" by ${payload.owner.name} on ${payload.site.name}.`,
+      imageUrl: payload.video.posterUrl ?? `${origin}/thumb/${payload.video.publicId}.jpg`,
+      url: window.location.href,
+      siteName: payload.site.name,
+    });
+  }, [payload]);
 
   if (payload === undefined) {
     return (
@@ -135,7 +150,14 @@ export default function Watch() {
               label="Embed"
             />
             <CopyButton value={window.location.href} label="Copy link" />
+            <CopyButton value={socialPreviewUrl(video.publicId)} label="Social preview" />
           </div>
+
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Sparkles className="size-3.5" />
+            Tip: paste the “Social preview” link in WhatsApp, X or Facebook to
+            show a video card with a play-button thumbnail.
+          </p>
 
           {video.error && video.status === "failed" && (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

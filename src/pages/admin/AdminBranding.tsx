@@ -35,10 +35,12 @@ export default function AdminBranding() {
   const settings = useQuery(api.settings.getAdminSettings);
   const updateSettings = useMutation(api.settings.updateSettings);
   const [form, setForm] = useState<BrandingForm | null>(null);
+  const [siteUrl, setSiteUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (settings && form === null) {
+      setSiteUrl(settings.site.siteUrl);
       setForm({
         brandName: settings.branding.brandName,
         brandTagline: settings.branding.brandTagline,
@@ -68,6 +70,17 @@ export default function AdminBranding() {
     setSaving(true);
     try {
       await updateSettings({ section: "branding", value: form });
+      if (settings) {
+        // Site-level fields (used by social preview “Watch now” links).
+        await updateSettings({
+          section: "site",
+          value: {
+            name: settings.site.name,
+            supportEmail: settings.site.supportEmail,
+            siteUrl,
+          },
+        });
+      }
       toast.success("Branding saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save branding");
@@ -103,6 +116,20 @@ export default function AdminBranding() {
               value={form.brandTagline}
               onChange={(e) => set("brandTagline", e.target.value)}
             />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="siteUrl">Site URL (optional)</Label>
+            <Input
+              id="siteUrl"
+              type="url"
+              placeholder="https://videos.example.com"
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Base URL used by social preview “Watch now” links (e.g.{" "}
+              https://demoy.freebuff.app).
+            </p>
           </div>
         </CardContent>
       </Card>

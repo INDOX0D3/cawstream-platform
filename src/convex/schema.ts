@@ -93,6 +93,10 @@ const schema = defineSchema(
       sourceStorageId: v.optional(v.id("_storage")),
       renditionStorageId: v.optional(v.id("_storage")),
       thumbnailStorageId: v.optional(v.id("_storage")),
+      // Social-preview thumbnail: the regular thumbnail composited with a
+      // play-button overlay, captured client-side at upload time. Used as the
+      // og:image / poster for link previews on X, Facebook, WhatsApp, etc.
+      socialThumbnailStorageId: v.optional(v.id("_storage")),
       thumbnailUrl: v.optional(v.string()), // external thumb (e.g. Mux image API)
       playbackType: v.optional(playbackTypeValidator),
       muxAssetId: v.optional(v.string()),

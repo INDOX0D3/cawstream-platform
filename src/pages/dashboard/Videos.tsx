@@ -25,9 +25,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
-import { embedCode, videoUrls } from "@/lib/embed";
+import { embedCode, socialPreviewUrl, videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
-import { extractMetadata, generateThumbnail, uploadBlob } from "@/lib/video";
+import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
 import {
@@ -96,6 +96,7 @@ export default function Videos() {
               key={video._id}
               video={video as VideoCardVideo}
               to={`/v/${video.publicId}`}
+              onEdit={() => setSelected(video)}
             />
           ))}
         </div>
@@ -155,6 +156,10 @@ function VideoDetailDialog({
   const embed = embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed });
 
   const save = async () => {
+    if (!title.trim()) {
+      toast.error("Title cannot be empty.");
+      return;
+    }
     setSaving(true);
     try {
       await updateVideo({ videoId: video._id, title, description });
@@ -194,9 +199,18 @@ function VideoDetailDialog({
       } catch {
         // a thumbnail is optional — the video can still be marked ready
       }
+      let socialThumbnailStorageId: Id<"_storage"> | undefined;
+      try {
+        const social = await generateSocialThumbnail(blob as File);
+        const socialUrl = await getUploadUrl();
+        socialThumbnailStorageId = (await uploadBlob(socialUrl, social)) as Id<"_storage">;
+      } catch {
+        // the play-button poster is optional too
+      }
       await completeProcessing({
         videoId: video._id,
         thumbnailStorageId,
+        socialThumbnailStorageId,
         duration: meta.duration,
         width: meta.width,
         height: meta.height,
@@ -409,7 +423,24 @@ function VideoDetailDialog({
                     <CopyButton value={urls.thumb} size="icon" label="Copy thumbnail URL" />
                   </span>
                 </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                  <span className="truncate text-muted-foreground">Social preview</span>
+                  <span className="flex items-center gap-2">
+                    <code className="max-w-[220px] truncate text-xs">
+                      {socialPreviewUrl(video.publicId)}
+                    </code>
+                    <CopyButton
+                      value={socialPreviewUrl(video.publicId)}
+                      size="icon"
+                      label="Copy social preview link"
+                    />
+                  </span>
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Paste the social preview link in WhatsApp, X or Facebook to show a
+                video card with a play-button thumbnail — no JavaScript needed.
+              </p>
             </TabsContent>
           </Tabs>
         </DialogContent>
