@@ -25,7 +25,8 @@ export function generatePublicId(length = 8): string {
 }
 
 export function isValidPublicId(id: string): boolean {
-  return /^[A-HJ-KM-NP-Z2-9]{8}$/.test(id);
+  // Must match the alphabet exactly (A–H, J–N, P–Z, 2–9): excludes I, O, 1, 0.
+  return /^[A-HJ-NP-Z2-9]{8}$/.test(id);
 }
 
 /** SHA-256 hex digest (used for non-reversible viewer hashing). */

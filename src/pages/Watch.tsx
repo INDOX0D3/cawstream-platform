@@ -1,4 +1,5 @@
 import { CopyButton } from "@/components/CopyButton";
+import { VideoCard } from "@/components/VideoCard";
 import { Logo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
@@ -7,13 +8,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { embedCode } from "@/lib/embed";
 import { formatCompact, formatDate } from "@/lib/format";
 import { useQuery } from "convex/react";
-import { Eye, Link2, Loader2, PlayCircle, UserRound } from "lucide-react";
+import { motion } from "framer-motion";
+import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, UserRound } from "lucide-react";
 import { Link, useParams } from "react-router";
 
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
   const payload = useQuery(api.videos.getWatch, { publicId });
+  const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(
     api.playerPrefs.getMyPlayerSettings,
     isAuthenticated ? {} : "skip",
@@ -62,11 +65,20 @@ export default function Watch() {
           <Logo />
         </Link>
         <div className="ml-auto flex items-center gap-2">
-          <Link to="/auth">
-            <Button variant="outline" size="sm">
-              Sign in
-            </Button>
-          </Link>
+          {isAuthenticated ? (
+            <Link to="/dashboard">
+              <Button variant="outline" size="sm">
+                <LayoutDashboard className="mr-1.5 size-3.5" />
+                Dashboard
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/auth">
+              <Button variant="outline" size="sm">
+                Sign in
+              </Button>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -117,6 +129,28 @@ export default function Watch() {
             </p>
           )}
         </div>
+
+        {related !== undefined && related.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.1 }}
+            className="mt-10"
+          >
+            <h2 className="text-lg font-semibold tracking-tight">
+              More from <span className="text-brand">@{owner.username}</span>
+            </h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {related.map((item) => (
+                <VideoCard
+                  key={item._id}
+                  video={item}
+                  to={`/v/${item.publicId}`}
+                />
+              ))}
+            </div>
+          </motion.section>
+        )}
       </main>
     </div>
   );

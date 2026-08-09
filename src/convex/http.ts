@@ -7,7 +7,7 @@ const http = httpRouter();
 
 auth.addHttpRoutes(http);
 
-const PUBLIC_ID_RE = /^[A-HJ-KM-NP-Z2-9]{8}$/;
+const PUBLIC_ID_RE = /^[A-HJ-NP-Z2-9]{8}$/; // matches src/convex/lib/ids.ts alphabet exactly
 
 /**
  * GET /video/{publicId} or /video/{publicId}.mp4

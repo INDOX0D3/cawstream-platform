@@ -1,272 +1,93 @@
-## Overview
+# CawStream — Video Hosting & Streaming Platform
 
-This project uses the following tech stack:
-- Vite
-- Typescript
-- React Router v7 (all imports from `react-router` instead of `react-router-dom`)
-- React 19 (for frontend components)
-- Tailwind v4 (for styling)
-- Shadcn UI (for UI components library)
-- Lucide Icons (for icons)
-- Convex (for backend & database)
-- Convex Auth (for authentication)
-- Framer Motion (for animations)
-- Three js (for 3d models)
+A complete, production-oriented video streaming platform: real upload pipeline,
+honest analytics, embed-ready players, per-creator monetization, a user
+dashboard and a full admin panel. Everything runs on your own deployment.
 
-All relevant files live in the 'src' directory.
+## Stack
 
-Use bun for the package manager.
+- **Frontend** — Vite, TypeScript, React 19, Tailwind v4, shadcn/ui, Framer Motion, hls.js
+- **Backend & database** — Convex (reactive queries, file storage, HTTP actions)
+- **Auth** — Convex Auth with email + password, OTP email verification, password reset
+- **Processing** — browser pipeline by default; Mux cloud transcoding (HLS) when Mux keys are set
+- **Email** — Resend via `RESEND_API_KEY` (falls back to a verifiable mail log in dev)
+- **Tests** — Vitest (`bun test`)
 
-## Setup
+## Quick start
 
-This project is set up already and running on a cloud environment, as well as a convex development in the sandbox.
-
-## Environment Variables
-
-The project is set up with project specific CONVEX_DEPLOYMENT and VITE_CONVEX_URL environment variables on the client side.
-
-The convex server has a separate set of environment variables that are accessible by the convex backend.
-
-Currently, these variables include auth-specific keys: JWKS, JWT_PRIVATE_KEY, and SITE_URL.
-
-
-# Using Authentication (Important!)
-
-You must follow these conventions when using authentication.
-
-## Auth is already set up.
-
-All convex authentication functions are already set up. The auth currently uses email OTP and anonymous users, but can support more.
-
-The email OTP configuration is defined in `src/convex/auth/emailOtp.ts`. DO NOT MODIFY THIS FILE.
-
-Also, DO NOT MODIFY THESE AUTH FILES: `src/convex/auth.config.ts` and `src/convex/auth.ts`.
-
-## Using Convex Auth on the backend
-
-On the `src/convex/users.ts` file, you can use the `getCurrentUser` function to get the current user's data.
-
-## Using Convex Auth on the frontend
-
-The `/auth` page is already set up to use auth. Navigate to `/auth` for all log in / sign up sequences.
-
-You MUST use this hook to get user data. Never do this yourself without the hook:
-```typescript
-import { useAuth } from "@/hooks/use-auth";
-
-const { isLoading, isAuthenticated, user, signIn, signOut } = useAuth();
+```bash
+bun install
+bun convex dev --once   # generate types
+bun dev
 ```
 
-## Protected Routes
+The first account that signs up automatically becomes the **administrator**
+(the equivalent of an installer's "create admin" step). Admins reach the panel
+via `/admin`.
 
-The starter `/dashboard` route is protected with `RequireAuth`, which sends
-signed-out users to `/auth?returnTo=<current route>`. Extend that page for the
-product's authenticated experience, and reuse `RequireAuth` when adding another
-protected route.
+## Environment variables (server-side only)
 
-## Auth Page
+Set these in the deployment environment — never in client code:
 
-The auth page is defined in `src/pages/Auth.tsx`. Send sign-in and sign-up actions
-to `/auth`.
+| Variable | Purpose |
+| --- | --- |
+| `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | Enable the Mux backend: uploads become cloud-transcoded HLS with an adaptive quality ladder. Without them, uploads use the browser pipeline. |
+| `RESEND_API_KEY` | Deliver verification/reset codes and admin test emails. Without it, emails are recorded in the mail log (Admin → Logs). |
+| `SITE_URL` | Public origin used by auth email flows. |
+| `JWKS` / `JWT_PRIVATE_KEY` | Auth signing keys (managed by the platform). |
 
-## Authorization
+Normal users can never read server credentials: SMTP details are masked in the
+API, and admins configure delivery through the admin panel, not `.env`.
 
-You can perform authorization checks on the frontend and backend.
+## How processing works
 
-On the frontend, you can use the `useAuth` hook to get the current user's data and authentication state.
+Two real pipelines, selected automatically:
 
-You should also be protecting queries, mutations, and actions at the base level, checking for authorization securely.
+- **Browser pipeline** — files are validated by their *magic bytes* (`src/lib/video.ts`),
+  then duration, resolution, codec and a real thumbnail are extracted from the
+  actual file. State (uploading → processing → ready/failed) is tracked in
+  `src/convex/videos.ts` with a processing job per upload.
+- **Mux pipeline** — with Mux keys set, files are PUT to a Mux direct upload and
+  polled until the transcode completes (`src/convex/processor.ts`). Playback
+  switches to HLS via hls.js with a native fallback for Safari.
 
-## Adding a redirect after auth
+## Public URLs (per video)
 
-The `/auth` route in `src/main.tsx` redirects to `/dashboard` by default. If the
-product's main authenticated route is different, update `redirectAfterAuth` to
-that route. A validated same-origin `returnTo` query parameter takes priority so
-users can resume the protected page they originally requested. Never leave an
-authenticated product redirecting back to the public landing page.
+Given a video's `publicId`:
 
-## Complete authenticated products
+- `/{publicId}` isn't used — instead:
+- `/v/{publicId}` — watch page
+- `/e/{publicId}` — iframe embed surface (chrome-free)
+- `/video/{publicId}.mp4` — direct MP4 stream (302 → storage, supports Range)
+- `/thumb/{publicId}.jpg` — thumbnail (302 → stored/Mux image)
 
-When the requested product implies accounts, a workspace, a dashboard, or other
-signed-in functionality, the task is not complete with only a landing page and
-auth form. Build the main authenticated experience, protect its route, and verify
-that signing in reaches it.
+These are served by Convex HTTP actions (`src/convex/http.ts`).
 
-# Frontend Conventions
+## Monetization
 
-You will be using the Vite frontend with React 19, Tailwind v4, and Shadcn UI.
+Creators configure smartlinks, social bars and popunders in
+Dashboard → Advertisements. Ads are resolved **server-side** from
+video → owner → ad settings at render time, so existing embeds pick up new ads
+without re-embedding. Ad code only ever executes inside the player/embed
+context — sandboxed iframe for social bars, detached window for popunders.
 
-Generally, pages should be in the `src/pages` folder, and components should be in the `src/components` folder.
+## Architecture notes
 
-Shadcn primitives are located in the `src/components/ui` folder and should be used by default.
+- `src/convex/schema.ts` — data model (users, videos, views, ads, settings, jobs, logs).
+- `src/convex/lib/storage.ts` — storage adapter; swap to S3/R2/B2 by replacing
+  these helpers without touching the rest of the codebase.
+- `src/convex/settings.ts` — admin-configurable player/branding/SMTP/site/limits,
+  persisted in `systemSettings`, sensitive values masked.
+- Analytics are non-invasive: a random per-browser id is SHA-256 hashed
+  server-side, and a viewer can only increment a video's count once per
+  10-minute window (`src/convex/views.ts`).
 
-## Page routing
+## Tests
 
-Your page component should go under the `src/pages` folder.
-
-When adding a page, update the react router configuration in `src/main.tsx` to include the new route you just added.
-
-## Shad CN conventions
-
-Follow these conventions when using Shad CN components, which you should use by default.
-- Remember to use "cursor-pointer" to make the element clickable
-- For title text, use the "tracking-tight font-bold" class to make the text more readable
-- Always make apps MOBILE RESPONSIVE. This is important
-- AVOID NESTED CARDS. Try and not to nest cards, borders, components, etc. Nested cards add clutter and make the app look messy.
-- AVOID SHADOWS. Avoid adding any shadows to components. stick with a thin border without the shadow.
-- Avoid skeletons; instead, use the loader2 component to show a spinning loading state when loading data.
-
-
-## Landing Pages
-
-You must always create good-looking designer-level styles to your application. 
-- Make it well animated and fit a certain "theme", ie neo brutalist, retro, neumorphism, glass morphism, etc
-
-Use known images and emojis from online.
-
-If the user is logged in already, show the get started button to say "Dashboard" or "Profile" instead to take them there.
-
-## Responsiveness and formatting
-
-Make sure pages are wrapped in a container to prevent the width stretching out on wide screens. Always make sure they are centered aligned and not off-center.
-
-Always make sure that your designs are mobile responsive. Verify the formatting to ensure it has correct max and min widths as well as mobile responsiveness.
-
-- Always create sidebars for protected dashboard pages and navigate between pages
-- Always create navbars for landing pages
-- On these bars, the created logo should be clickable and redirect to the index page
-
-## Animating with Framer Motion
-
-You must add animations to components using Framer Motion. It is already installed and configured in the project.
-
-To use it, import the `motion` component from `framer-motion` and use it to wrap the component you want to animate.
-
-
-### Other Items to animate
-- Fade in and Fade Out
-- Slide in and Slide Out animations
-- Rendering animations
-- Button clicks and UI elements
-
-Animate for all components, including on landing page and app pages.
-
-## Three JS Graphics
-
-Your app comes with three js by default. You can use it to create 3D graphics for landing pages, games, etc.
-
-
-## Colors
-
-You can override colors in: `src/index.css`
-
-This uses the oklch color format for tailwind v4.
-
-Always use these color variable names.
-
-Make sure all ui components are set up to be mobile responsive and compatible with both light and dark mode.
-
-Set theme using `dark` or `light` variables at the parent className.
-
-## Styling and Theming
-
-When changing the theme, always change the underlying theme of the shad cn components app-wide under `src/components/ui` and the colors in the index.css file.
-
-Avoid hardcoding in colors unless necessary for a use case, and properly implement themes through the underlying shad cn ui components.
-
-When styling, ensure buttons and clickable items have pointer-click on them (don't by default).
-
-Always follow a set theme style and ensure it is tuned to the user's liking.
-
-## Toasts
-
-You should always use toasts to display results to the user, such as confirmations, results, errors, etc.
-
-Use the shad cn Sonner component as the toaster. For example:
-
-```
-import { toast } from "sonner"
-
-import { Button } from "@/components/ui/button"
-export function SonnerDemo() {
-  return (
-    <Button
-      variant="outline"
-      onClick={() =>
-        toast("Event has been created", {
-          description: "Sunday, December 03, 2023 at 9:00 AM",
-          action: {
-            label: "Undo",
-            onClick: () => console.log("Undo"),
-          },
-        })
-      }
-    >
-      Show Toast
-    </Button>
-  )
-}
+```bash
+bun test
 ```
 
-Remember to import { toast } from "sonner". Usage: `toast("Event has been created.")`
-
-## Dialogs
-
-Always ensure your larger dialogs have a scroll in its content to ensure that its content fits the screen size. Make sure that the content is not cut off from the screen.
-
-Ideally, instead of using a new page, use a Dialog instead. 
-
-# Using the Convex backend
-
-You will be implementing the convex backend. Follow your knowledge of convex and the documentation to implement the backend.
-
-## The Convex Schema
-
-You must correctly follow the convex schema implementation.
-
-The schema is defined in `src/convex/schema.ts`.
-
-Do not include the `_id` and `_creationTime` fields in your queries (it is included by default for each table).
-Do not index `_creationTime` as it is indexed for you. Never have duplicate indexes.
-
-
-## Convex Actions: Using CRUD operations
-
-When running anything that involves external connections, you must use a convex action with "use node" at the top of the file.
-
-You cannot have queries or mutations in the same file as a "use node" action file. Thus, you must use pre-built queries and mutations in other files.
-
-You can also use the pre-installed internal crud functions for the database:
-
-```ts
-// in convex/users.ts
-import { crud } from "convex-helpers/server/crud";
-import schema from "./schema.ts";
-
-export const { create, read, update, destroy } = crud(schema, "users");
-
-// in some file, in an action:
-const user = await ctx.runQuery(internal.users.read, { id: userId });
-
-await ctx.runMutation(internal.users.update, {
-  id: userId,
-  patch: {
-    status: "inactive",
-  },
-});
-```
-
-
-## Common Convex Mistakes To Avoid
-
-When using convex, make sure:
-- Document IDs are referenced as `_id` field, not `id`.
-- Document ID types are referenced as `Id<"TableName">`, not `string`.
-- Document object types are referenced as `Doc<"TableName">`.
-- Keep schemaValidation to false in the schema file.
-- You must correctly type your code so that it passes the type checker.
-- You must handle null / undefined cases of your convex queries for both frontend and backend, or else it will throw an error that your data could be null or undefined.
-- Always use the `@/folder` path, with `@/convex/folder/file.ts` syntax for importing convex files.
-- This includes importing generated files like `@/convex/_generated/server`, `@/convex/_generated/api`
-- Remember to import functions like useQuery, useMutation, useAction, etc. from `convex/react`
-- NEVER have return type validators.
+Covers the pure pipeline helpers (container detection by magic bytes, upload
+validation), formatting utilities, server-side validation rules and public id
+generation.
