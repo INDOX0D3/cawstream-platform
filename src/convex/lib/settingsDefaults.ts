@@ -1,0 +1,86 @@
+/**
+ * Default values for admin-configurable settings. Stored in systemSettings.
+ */
+
+export interface PlayerSettings {
+  aspectRatio: string; // "16:9" | "4:3" | "1:1" | "21:9"
+  defaultQuality: string; // "auto" | "source"
+  autoplay: boolean;
+  controls: boolean;
+  pictureInPicture: boolean;
+  defaultVolume: number; // 0..1
+  showBranding: boolean;
+}
+
+export interface BrandingSettings {
+  watermarkEnabled: boolean;
+  watermarkText: string;
+  watermarkLogoUrl: string; // optional image URL
+  watermarkPosition: string; // top-right | top-left | bottom-right | bottom-left | center
+  watermarkSize: number; // px
+  watermarkOpacity: number; // 0..1
+  watermarkMargin: number; // px
+  brandName: string;
+  brandTagline: string;
+}
+
+export interface SmtpSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password: string; // server-side only; masked in the API
+  encryption: string; // none | tls | ssl
+  senderName: string;
+  senderEmail: string;
+}
+
+export interface SiteSettings {
+  name: string;
+  supportEmail: string;
+}
+
+export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
+  aspectRatio: "16:9",
+  defaultQuality: "auto",
+  autoplay: false,
+  controls: true,
+  pictureInPicture: true,
+  defaultVolume: 0.8,
+  showBranding: true,
+};
+
+export const DEFAULT_BRANDING: BrandingSettings = {
+  watermarkEnabled: true,
+  watermarkText: "CawStream",
+  watermarkLogoUrl: "",
+  watermarkPosition: "top-right",
+  watermarkSize: 14,
+  watermarkOpacity: 0.65,
+  watermarkMargin: 12,
+  brandName: "CawStream",
+  brandTagline: "Video hosting & streaming",
+};
+
+export const DEFAULT_SMTP: SmtpSettings = {
+  enabled: false,
+  host: "",
+  port: 587,
+  username: "",
+  password: "",
+  encryption: "tls",
+  senderName: "CawStream",
+  senderEmail: "",
+};
+
+export const DEFAULT_SITE: SiteSettings = {
+  name: "CawStream",
+  supportEmail: "",
+};
+
+export const SETTING_KEYS = {
+  PLAYER: "player",
+  BRANDING: "branding",
+  SMTP: "smtp",
+  SITE: "site",
+} as const;

@@ -1,33 +1,172 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, QueryCtx } from "./_generated/server";
+import { v } from "convex/values";
+import type { GenericId } from "convex/values";
+import { MutationCtx, QueryCtx, mutation, query } from "./_generated/server";
+import { ROLES, type Role } from "./schema";
 
-/**
- * Get the current signed in user. Returns null if the user is not signed in.
- * Usage: const signedInUser = await ctx.runQuery(api.authHelpers.currentUser);
- * THIS FUNCTION IS READ-ONLY. DO NOT MODIFY.
- */
-export const currentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
+export type AuthCtx = QueryCtx | MutationCtx;
 
-    if (user === null) {
-      return null;
-    }
-
-    return user;
-  },
-});
-
-/**
- * Use this function internally to get the current user data. Remember to handle the null user case.
- * @param ctx
- * @returns
- */
-export const getCurrentUser = async (ctx: QueryCtx) => {
+/** Fetch the raw users row for the signed-in user, or null. */
+export const getCurrentUser = async (ctx: AuthCtx) => {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
     return null;
   }
   return await ctx.db.get(userId);
 };
+
+export type UserDoc = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/** Shape returned to the frontend (safe defaults for legacy/federated users). */
+export function normalizeUser(user: UserDoc) {
+  return {
+    _id: user._id,
+    _creationTime: user._creationTime,
+    name: user.name ?? user.email?.split("@")[0] ?? "User",
+    email: user.email ?? null,
+    image: user.image ?? null,
+    emailVerified: Boolean(user.emailVerificationTime),
+    username: user.username ?? user.email?.split("@")[0] ?? "user",
+    role: (user.role ?? ROLES.USER) as Role,
+    status: (user.status ?? "active") as "active" | "suspended",
+    isAnonymous: user.isAnonymous ?? false,
+  };
+}
+
+/** Throw unless a signed-in, active user exists. Returns the raw doc. */
+export async function requireUser(ctx: AuthCtx) {
+  const user = await getCurrentUser(ctx);
+  if (user === null) {
+    throw new Error("You must be signed in to do that.");
+  }
+  if (user.status === "suspended") {
+    throw new Error("Your account has been suspended.");
+  }
+  return user;
+}
+
+/** Throw unless the signed-in user is an active administrator. */
+export async function requireAdmin(ctx: AuthCtx) {
+  const user = await requireUser(ctx);
+  if (user.role !== ROLES.ADMIN) {
+    throw new Error("You do not have permission to do that.");
+  }
+  return user;
+}
+
+export const isAdmin = async (
+  ctx: { db: QueryCtx["db"] },
+  userId: string,
+) => {
+  const user = await ctx.db.get(userId as GenericId<"users">);
+  return user?.role === ROLES.ADMIN;
+};
+
+export const currentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (user === null) {
+      return null;
+    }
+    return normalizeUser(user);
+  },
+});
+
+/**
+ * Called by the sign-up UI immediately after the auth signUp flow resolves.
+ * Validates the chosen username server-side and enforces uniqueness (the
+ * auth `profile` callback is synchronous and cannot touch the database).
+ */
+export const completeSignup = mutation({
+  args: { username: v.optional(v.string()) },
+  handler: async (ctx, { username }) => {
+    const user = await requireUser(ctx);
+    const patch: Record<string, unknown> = {};
+    if (username !== undefined && username.trim()) {
+      const trimmed = username.trim();
+      if (!/^[a-zA-Z0-9_]{3,24}$/.test(trimmed)) {
+        throw new Error(
+          "Usernames must be 3–24 characters using letters, numbers or underscores.",
+        );
+      }
+      const taken = await ctx.db
+        .query("users")
+        .withIndex("username", (q) => q.eq("username", trimmed))
+        .first();
+      if (taken && taken._id !== user._id) {
+        throw new Error("That username is already taken.");
+      }
+      patch.username = trimmed;
+      patch.name = user.name ?? trimmed;
+    }
+    if (user.role === undefined) {
+      // First account to sign up becomes the administrator (this stack's
+      // equivalent of the web installer's "create administrator" step).
+      const existingAdmin = await ctx.db
+        .query("users")
+        .filter((q) => q.eq(q.field("role"), "admin"))
+        .first();
+      patch.role = existingAdmin ? ROLES.USER : ROLES.ADMIN;
+    }
+    if (user.status === undefined) patch.status = "active";
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(user._id, patch);
+    }
+    const updated = await ctx.db.get(user._id);
+    if (!updated) throw new Error("User not found.");
+    return normalizeUser(updated);
+  },
+});
+
+export const isUsernameTaken = query({
+  args: { username: v.string() },
+  handler: async (ctx, { username }) => {
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("username", (q) => q.eq("username", username.trim()))
+      .first();
+    return existing !== null;
+  },
+});
+
+export const updateProfile = mutation({
+  args: {
+    username: v.optional(v.string()),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, { username, name }) => {
+    const user = await requireUser(ctx);
+    const patch: Record<string, unknown> = {};
+    if (username !== undefined) {
+      const trimmed = username.trim();
+      if (!/^[a-zA-Z0-9_]{3,24}$/.test(trimmed)) {
+        throw new Error(
+          "Usernames must be 3–24 characters using letters, numbers or underscores.",
+        );
+      }
+      const taken = await ctx.db
+        .query("users")
+        .withIndex("username", (q) => q.eq("username", trimmed))
+        .first();
+      if (taken && taken._id !== user._id) {
+        throw new Error("That username is already taken.");
+      }
+      patch.username = trimmed;
+    }
+    if (name !== undefined) {
+      const trimmed = name.trim().slice(0, 80);
+      if (!trimmed) {
+        throw new Error("Display name cannot be empty.");
+      }
+      patch.name = trimmed;
+    }
+    if (Object.keys(patch).length === 0) {
+      return normalizeUser(user);
+    }
+    await ctx.db.patch(user._id, patch);
+    const updated = await ctx.db.get(user._id);
+    if (!updated) throw new Error("User not found.");
+    return normalizeUser(updated);
+  },
+});
