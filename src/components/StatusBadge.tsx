@@ -6,6 +6,8 @@ const VIDEO_STYLES: Record<string, { dot: string; text: string }> = {
   processing: { dot: "bg-amber-500/80", text: "text-amber-700 dark:text-amber-300" },
   ready: { dot: "bg-emerald-500/80", text: "text-emerald-700 dark:text-emerald-300" },
   failed: { dot: "bg-red-500/80", text: "text-red-700 dark:text-red-300" },
+  sent: { dot: "bg-emerald-500/80", text: "text-emerald-700 dark:text-emerald-300" },
+  logged: { dot: "bg-amber-500/80", text: "text-amber-700 dark:text-amber-300" },
 };
 
 const ACCOUNT_STYLES: Record<string, { dot: string; text: string }> = {

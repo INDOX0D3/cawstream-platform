@@ -1,8 +1,13 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
+import { Scrypt } from "lucia";
 import { v } from "convex/values";
 import type { GenericId } from "convex/values";
 import { MutationCtx, QueryCtx, mutation, query } from "./_generated/server";
 import { ROLES, type Role } from "./schema";
+
+// Password hashing uses the same Scrypt primitive as Convex Auth's Password
+// provider (`lucia`), so change-password can verify and re-hash the stored
+// secret without importing any additional dependency.
 
 export type AuthCtx = QueryCtx | MutationCtx;
 
@@ -127,6 +132,75 @@ export const isUsernameTaken = query({
       .withIndex("username", (q) => q.eq("username", username.trim()))
       .first();
     return existing !== null;
+  },
+});
+
+/**
+ * Change the account password (Security page). Verifies the current password
+ * against the stored Scrypt hash, re-hashes the new one, and invalidates every
+ * other active session while keeping the current one signed in.
+ */
+export const changePassword = mutation({
+  args: {
+    currentPassword: v.string(),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, { currentPassword, newPassword }) => {
+    const user = await requireUser(ctx);
+    if (!currentPassword) {
+      throw new Error("Enter your current password.");
+    }
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error("New password must be at least 8 characters.");
+    }
+    if (newPassword.length > 128) {
+      throw new Error("New password must be at most 128 characters.");
+    }
+
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) =>
+        q.eq("userId", user._id).eq("provider", "password"),
+      )
+      .first();
+    if (!account?.secret) {
+      throw new Error("This account has no password to change.");
+    }
+    const scrypt = new Scrypt();
+    const valid = await scrypt.verify(account.secret, currentPassword);
+    if (!valid) {
+      throw new Error("Current password is incorrect.");
+    }
+
+    await ctx.db.patch(account._id, { secret: await scrypt.hash(newPassword) });
+
+    // Keep the current session, invalidate all others (and their refresh tokens).
+    const sessionId = await getAuthSessionId(ctx);
+    const sessions = await ctx.db
+      .query("authSessions")
+      .withIndex("userId", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const session of sessions) {
+      if (session._id === sessionId) continue;
+      const refreshTokens = await ctx.db
+        .query("authRefreshTokens")
+        .withIndex("sessionId", (q) => q.eq("sessionId", session._id))
+        .collect();
+      for (const token of refreshTokens) await ctx.db.delete(token._id);
+      await ctx.db.delete(session._id);
+    }
+
+    try {
+      await ctx.db.insert("systemLogs", {
+        level: "info",
+        source: "auth",
+        message: `Password changed for ${user.email ?? user._id}`,
+        createdAt: Date.now(),
+      });
+    } catch {
+      // logging must never block the password change
+    }
+    return { ok: true };
   },
 });
 

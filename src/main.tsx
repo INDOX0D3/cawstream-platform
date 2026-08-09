@@ -1,6 +1,8 @@
-import '@vly-ai/integrations';
+import "@vly-ai/integrations";
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RequireAdmin } from "@/components/RequireAdmin";
+import { AdminShell, AppShell } from "@/components/layout/Shell";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -12,7 +14,24 @@ import "./index.css";
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
-const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
+const DashboardOverview = lazy(() => import("./pages/Dashboard.tsx"));
+const Videos = lazy(() => import("./pages/dashboard/Videos.tsx"));
+const Upload = lazy(() => import("./pages/dashboard/Upload.tsx"));
+const Advertisements = lazy(() => import("./pages/dashboard/Advertisements.tsx"));
+const PlayerSettings = lazy(() => import("./pages/dashboard/PlayerSettings.tsx"));
+const Profile = lazy(() => import("./pages/dashboard/Profile.tsx"));
+const Security = lazy(() => import("./pages/dashboard/Security.tsx"));
+const AdminOverview = lazy(() => import("./pages/admin/AdminOverview.tsx"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers.tsx"));
+const AdminVideos = lazy(() => import("./pages/admin/AdminVideos.tsx"));
+const AdminStorage = lazy(() => import("./pages/admin/AdminStorage.tsx"));
+const AdminPlayer = lazy(() => import("./pages/admin/AdminPlayer.tsx"));
+const AdminBranding = lazy(() => import("./pages/admin/AdminBranding.tsx"));
+const AdminSmtp = lazy(() => import("./pages/admin/AdminSmtp.tsx"));
+const AdminSystem = lazy(() => import("./pages/admin/AdminSystem.tsx"));
+const AdminLogs = lazy(() => import("./pages/admin/AdminLogs.tsx"));
+const Watch = lazy(() => import("./pages/Watch.tsx"));
+const Embed = lazy(() => import("./pages/Embed.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -128,10 +147,40 @@ createRoot(document.getElementById("root")!).render(
                 path="/dashboard"
                 element={
                   <RequireAuth>
-                    <Dashboard />
+                    <AppShell />
                   </RequireAuth>
                 }
-              />
+              >
+                <Route index element={<DashboardOverview />} />
+                <Route path="videos" element={<Videos />} />
+                <Route path="upload" element={<Upload />} />
+                <Route path="advertisements" element={<Advertisements />} />
+                <Route path="player" element={<PlayerSettings />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="security" element={<Security />} />
+              </Route>
+              <Route
+                path="/admin"
+                element={
+                  <RequireAuth>
+                    <RequireAdmin>
+                      <AdminShell />
+                    </RequireAdmin>
+                  </RequireAuth>
+                }
+              >
+                <Route index element={<AdminOverview />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="videos" element={<AdminVideos />} />
+                <Route path="storage" element={<AdminStorage />} />
+                <Route path="player" element={<AdminPlayer />} />
+                <Route path="branding" element={<AdminBranding />} />
+                <Route path="smtp" element={<AdminSmtp />} />
+                <Route path="system" element={<AdminSystem />} />
+                <Route path="logs" element={<AdminLogs />} />
+              </Route>
+              <Route path="/v/:publicId" element={<Watch />} />
+              <Route path="/e/:publicId" element={<Embed />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

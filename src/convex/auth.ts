@@ -48,11 +48,11 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (params.flow === "signUp") {
           const username = rawUsername || email.split("@")[0].slice(0, 24) || "user";
           profile.name = rawName || username;
-          // NOTE: `username` is intentionally NOT set here. The sign-up UI
-          // claims it immediately after via users.completeSignup, which is the
-          // only place uniqueness is enforced (the profile callback is
-          // synchronous and cannot query the database).
-          profile.role = "user";
+          // NOTE: `username` and `role` are intentionally NOT set here.
+          // users.completeSignup — called by the sign-up UI right after email
+          // verification — enforces username uniqueness and promotes the first
+          // account on the deployment to administrator (the profile callback
+          // is synchronous and cannot query the database).
           profile.status = "active";
         } else if (rawName) {
           profile.name = rawName;

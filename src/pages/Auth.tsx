@@ -1,3 +1,4 @@
+import { CawMark, Logo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,199 +14,493 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-
+import { Label } from "@/components/ui/label";
+import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import logo from "@/assets/logo.svg";
-import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { useMutation } from "convex/react";
+import {
+  ArrowRight,
+  AtSign,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  RefreshCw,
+  ShieldCheck,
+  UserRound,
+  Zap,
+} from "lucide-react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface AuthProps {
   redirectAfterAuth?: string;
 }
 
-function resolveRedirectAfterAuth(
-  returnTo: string | null,
-  fallback = "/dashboard",
-) {
+function resolveRedirectAfterAuth(returnTo: string | null, fallback = "/dashboard") {
   if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
     return returnTo;
   }
   return fallback;
 }
 
+type Step =
+  | { mode: "signIn" }
+  | { mode: "signUp" }
+  | {
+      mode: "verify";
+      email: string;
+      password: string;
+      isNewUser: boolean;
+      username?: string;
+    }
+  | { mode: "forgot" }
+  | { mode: "reset"; email: string };
+
+const BULLETS = [
+  {
+    icon: Zap,
+    title: "Instant uploads",
+    text: "Files are verified by their real bytes and processed right in your browser.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Secure by default",
+    text: "Scrypt-hashed passwords, expiring verification codes and rate-limited sign-ins.",
+  },
+  {
+    icon: RefreshCw,
+    title: "Mux-ready",
+    text: "Drop in your Mux keys and every new upload becomes cloud-transcoded HLS.",
+  },
+];
+
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const completeSignup = useMutation(api.users.completeSignup);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const redirect = resolveRedirectAfterAuth(
-    searchParams.get("returnTo"),
-    redirectAfterAuth,
-  );
-  const [step, setStep] = useState<"signIn" | { email: string }>("signIn");
+  const redirect = resolveRedirectAfterAuth(searchParams.get("returnTo"), redirectAfterAuth);
+
+  const [step, setStep] = useState<Step>({ mode: "signIn" });
   const [otp, setOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const didNavigate = useRef(false);
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
+    if (!authLoading && isAuthenticated && !didNavigate.current) {
+      didNavigate.current = true;
       navigate(redirect);
     }
   }, [authLoading, isAuthenticated, navigate, redirect]);
-  const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+
+  const fail = (err: unknown, fallback: string) => {
+    const message = err instanceof Error && err.message ? err.message : fallback;
+    setError(message);
+    setIsLoading(false);
+  };
+
+  // ---------------------------------------------------------------- sign in
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setIsLoading(true);
     setError(null);
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-      setStep({ email: formData.get("email") as string });
+      const result = await signIn("password", { flow: "signIn", email, password });
+      if (!result.signingIn) {
+        setStep({ mode: "verify", email, password, isNewUser: false });
+        setOtp("");
+      }
       setIsLoading(false);
-    } catch (error) {
-      console.error("Email sign-in error:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to send verification code. Please try again.",
-      );
-      setIsLoading(false);
+    } catch (err) {
+      fail(err, "Sign-in failed. Check your email and password.");
     }
   };
 
-  const handleOtpSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  // ---------------------------------------------------------------- sign up
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    const form = new FormData(e.currentTarget);
+    const username = String(form.get("username") ?? "").trim();
+    const name = String(form.get("name") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    const password = String(form.get("password") ?? "");
+    const confirm = String(form.get("confirm") ?? "");
+
+    if (!/^[a-zA-Z0-9_]{3,24}$/.test(username)) {
+      setError("Usernames must be 3–24 characters using letters, numbers or underscores.");
+      setIsLoading(false);
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setIsLoading(false);
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      setIsLoading(false);
+      return;
+    }
+    try {
+      await signIn("password", {
+        flow: "signUp",
+        email,
+        password,
+        username,
+        name: name || username,
+      });
+      setStep({ mode: "verify", email, password, isNewUser: true, username });
+      setOtp("");
+      setIsLoading(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (/already/i.test(message)) {
+        setError(
+          "An account with this email already exists — sign in instead, or use “Forgot password”.",
+        );
+      } else {
+        fail(err, "Could not create your account.");
+      }
+    }
+  };
+
+  // --------------------------------------------------------- verify (OTP)
+  const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (step.mode !== "verify") return;
     setIsLoading(true);
     setError(null);
     try {
-      const formData = new FormData(event.currentTarget);
-      await signIn("email-otp", formData);
-
-      console.log("signed in");
-
-      navigate(redirect);
-    } catch (error) {
-      console.error("OTP verification error:", error);
-
-      setError("The verification code you entered is incorrect.");
-      setIsLoading(false);
-
+      const result = await signIn("password", {
+        flow: "email-verification",
+        email: step.email,
+        code: otp,
+      });
+      if (result.signingIn) {
+        if (step.isNewUser && step.username) {
+          try {
+            await completeSignup({ username: step.username });
+          } catch (err) {
+            // Account is verified but the username claim failed — surface it,
+            // the profile page can fix it.
+            toast.error(
+              err instanceof Error ? err.message : "Could not finalize your username.",
+            );
+          }
+        }
+        setIsLoading(false);
+        // navigation happens via the authenticated effect
+      } else {
+        setError("That code is invalid or has expired.");
+        setOtp("");
+        setIsLoading(false);
+      }
+    } catch (err) {
+      fail(err, "That code is invalid or has expired.");
       setOtp("");
     }
   };
 
-  const handleGuestLogin = async () => {
+  const resendVerify = async () => {
+    if (step.mode !== "verify") return;
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Attempting anonymous sign in...");
-      await signIn("anonymous");
-      console.log("Anonymous sign in successful");
-      navigate(redirect);
-    } catch (error) {
-      console.error("Guest login error:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
-      setError(`Failed to sign in as guest: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      await signIn("password", { flow: "signIn", email: step.email, password: step.password });
+      toast.success("A new code is on its way");
+    } catch (err) {
+      fail(err, "Could not resend the code.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --------------------------------------------------------- forgot / reset
+  const handleForgot = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
+    try {
+      const result = await signIn("password", { flow: "reset", email });
+      void result;
+      setStep({ mode: "reset", email });
+      setOtp("");
+      setIsLoading(false);
+    } catch (err) {
+      // Never confirm whether an email exists — same message either way.
+      setError("If that email exists, a reset code has been sent.");
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (step.mode !== "reset") return;
+    setIsLoading(true);
+    setError(null);
+    const form = new FormData(e.currentTarget);
+    const newPassword = String(form.get("newPassword") ?? "");
+    const confirm = String(form.get("confirm") ?? "");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setIsLoading(false);
+      return;
+    }
+    if (newPassword !== confirm) {
+      setError("Passwords do not match.");
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const result = await signIn("password", {
+        flow: "reset-verification",
+        email: step.email,
+        code: otp,
+        newPassword,
+      });
+      if (!result.signingIn) {
+        setError("That code is invalid or has expired.");
+        setOtp("");
+        setIsLoading(false);
+      } else {
+        toast.success("Password updated — you’re signed in");
+        setIsLoading(false);
+        // navigation happens via the authenticated effect
+      }
+    } catch (err) {
+      fail(err, "That code is invalid or has expired.");
+      setOtp("");
+    }
+  };
+
+  const resendReset = async () => {
+    if (step.mode !== "reset") return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await signIn("password", { flow: "reset", email: step.email });
+      toast.success("A new code is on its way");
+    } catch {
+      setError("Could not resend the code.");
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center gap-10 px-4 py-10 lg:flex-row lg:items-center">
+        {/* Brand panel (desktop) */}
+        <div className="hidden max-w-sm flex-col gap-6 lg:flex">
+          <Logo className="text-foreground" />
+          <div>
+            <h2 className="text-3xl font-semibold leading-tight tracking-tight">
+              Own your video stack — from upload to embed.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              One account, real processing, real analytics, real embed codes.
+            </p>
+          </div>
+          <div className="space-y-4">
+            {BULLETS.map(({ icon: Icon, title, text }) => (
+              <div key={title} className="flex gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-brand">
+                  <Icon className="size-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-medium">{title}</p>
+                  <p className="text-xs leading-5 text-muted-foreground">{text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      
-      {/* Auth Content */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center justify-center h-full flex-col">
-        <Card className="min-w-[350px] pb-0 border shadow-md">
-          {step === "signIn" ? (
+        {/* Form card */}
+        <Card className="w-full max-w-md border shadow-lg shadow-black/5">
+          {step.mode === "signIn" || step.mode === "signUp" ? (
             <>
               <CardHeader className="text-center">
-              <div className="flex justify-center">
-                    <img
-                      src={logo}
-                      alt="Lock Icon"
-                      width={64}
-                      height={64}
-                      className="rounded-lg mb-4 mt-4 cursor-pointer"
-                      onClick={() => navigate("/")}
-                    />
-                  </div>
-                <CardTitle className="text-xl">Get Started</CardTitle>
+                <div className="mb-2 flex justify-center">
+                  <CawMark className="size-10 rounded-xl bg-foreground p-2 text-background" />
+                </div>
+                <CardTitle className="text-xl">
+                  {step.mode === "signIn" ? "Welcome back" : "Create your account"}
+                </CardTitle>
                 <CardDescription>
-                  Enter your email to log in or sign up
+                  {step.mode === "signIn"
+                    ? "Sign in with your email and password."
+                    : "Sign up — you’ll verify your email to continue."}
                 </CardDescription>
               </CardHeader>
-              <form onSubmit={handleEmailSubmit}>
-                <CardContent>
-                  
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <CardContent>
+                <form
+                  onSubmit={step.mode === "signIn" ? handleSignIn : handleSignUp}
+                  className="space-y-4"
+                >
+                  {step.mode === "signUp" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="username">Username</Label>
+                        <div className="relative">
+                          <AtSign className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            id="username"
+                            name="username"
+                            className="pl-9"
+                            placeholder="creator"
+                            autoComplete="username"
+                            required
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Display name</Label>
+                        <div className="relative">
+                          <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            id="name"
+                            name="name"
+                            className="pl-9"
+                            placeholder="Your name"
+                            autoComplete="name"
+                            disabled={isLoading}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
+                        id="email"
                         name="email"
-                        placeholder="name@example.com"
                         type="email"
                         className="pl-9"
-                        disabled={isLoading}
+                        placeholder="name@example.com"
+                        autoComplete="email"
                         required
+                        disabled={isLoading}
                       />
                     </div>
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="icon"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <ArrowRight className="h-4 w-4" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="password">Password</Label>
+                      {step.mode === "signIn" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStep({ mode: "forgot" });
+                            setError(null);
+                          }}
+                          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          Forgot password?
+                        </button>
                       )}
-                    </Button>
-                  </div>
-                  {error && (
-                    <p className="mt-2 text-sm text-red-500">{error}</p>
-                  )}
-                  
-                  <div className="mt-4">
-                    <div className="relative">
-                      <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                      </div>
-                      <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">
-                          Or
-                        </span>
-                      </div>
                     </div>
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={handleGuestLogin}
-                      disabled={isLoading}
-                    >
-                      <UserX className="mr-2 h-4 w-4" />
-                      Continue as Guest
-                    </Button>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        className="pl-9 pr-10"
+                        placeholder={step.mode === "signUp" ? "At least 8 characters" : "Your password"}
+                        autoComplete={step.mode === "signUp" ? "new-password" : "current-password"}
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Toggle password visibility"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
-                </CardContent>
-              </form>
+                  {step.mode === "signUp" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm">Confirm password</Label>
+                      <Input
+                        id="confirm"
+                        name="confirm"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
+                  {error && (
+                    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {error}
+                    </p>
+                  )}
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        {step.mode === "signIn" ? "Signing in…" : "Creating account…"}
+                      </>
+                    ) : (
+                      <>
+                        {step.mode === "signIn" ? "Sign in" : "Create account"}
+                        <ArrowRight className="ml-2 size-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+              <CardFooter className="justify-center border-t pt-4">
+                <p className="text-sm text-muted-foreground">
+                  {step.mode === "signIn" ? "New to CawStream?" : "Already have an account?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(step.mode === "signIn" ? { mode: "signUp" } : { mode: "signIn" });
+                      setError(null);
+                    }}
+                    className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-brand"
+                  >
+                    {step.mode === "signIn" ? "Create one" : "Sign in"}
+                  </button>
+                </p>
+              </CardFooter>
             </>
-          ) : (
+          ) : step.mode === "verify" ? (
             <>
-              <CardHeader className="text-center mt-4">
-                <CardTitle>Check your email</CardTitle>
+              <CardHeader className="text-center">
+                <div className="mb-2 flex justify-center">
+                  <Mail className="size-9 text-brand" />
+                </div>
+                <CardTitle className="text-xl">Check your email</CardTitle>
                 <CardDescription>
-                  We've sent a code to {step.email}
+                  We sent a 6-digit code to <span className="font-medium">{step.email}</span>.
+                  It expires in 10 minutes.
                 </CardDescription>
               </CardHeader>
-              <form onSubmit={handleOtpSubmit}>
+              <form onSubmit={handleVerify}>
                 <CardContent className="pb-4">
-                  <input type="hidden" name="email" value={step.email} />
-                  <input type="hidden" name="code" value={otp} />
-
                   <div className="flex justify-center">
                     <InputOTP
                       value={otp}
@@ -214,11 +509,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       disabled={isLoading}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && otp.length === 6 && !isLoading) {
-                          // Find the closest form and submit it
-                          const form = (e.target as HTMLElement).closest("form");
-                          if (form) {
-                            form.requestSubmit();
-                          }
+                          (e.target as HTMLElement).closest("form")?.requestSubmit();
                         }
                       }}
                     >
@@ -230,20 +521,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </InputOTP>
                   </div>
                   {error && (
-                    <p className="mt-2 text-sm text-red-500 text-center">
+                    <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-center text-sm text-destructive">
                       {error}
                     </p>
                   )}
-                  <p className="text-sm text-muted-foreground text-center mt-4">
-                    Didn't receive a code?{" "}
-                    <Button
-                      variant="link"
-                      className="p-0 h-auto"
-                      onClick={() => setStep("signIn")}
-                    >
-                      Try again
-                    </Button>
-                  </p>
                 </CardContent>
                 <CardFooter className="flex-col gap-2">
                   <Button
@@ -252,44 +533,194 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     disabled={isLoading || otp.length !== 6}
                   >
                     {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verifying...
-                      </>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
                     ) : (
-                      <>
-                        Verify code
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
+                      "Verify email"
                     )}
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setStep("signIn")}
-                    disabled={isLoading}
                     className="w-full"
+                    onClick={resendVerify}
+                    disabled={isLoading}
                   >
-                    Use different email
+                    <RefreshCw className="mr-2 size-4" />
+                    Resend code
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-muted-foreground"
+                    onClick={() => {
+                      setStep({ mode: "signIn" });
+                      setError(null);
+                    }}
+                    disabled={isLoading}
+                  >
+                    Use a different email
+                  </Button>
+                </CardFooter>
+              </form>
+            </>
+          ) : step.mode === "forgot" ? (
+            <>
+              <CardHeader className="text-center">
+                <div className="mb-2 flex justify-center">
+                  <Lock className="size-9 text-brand" />
+                </div>
+                <CardTitle className="text-xl">Reset your password</CardTitle>
+                <CardDescription>
+                  Enter your email and we’ll send you a code to set a new password.
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleForgot}>
+                <CardContent className="space-y-4 pb-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      name="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {error && (
+                    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {error}
+                    </p>
+                  )}
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      <>
+                        Send reset code
+                        <ArrowRight className="ml-2 size-4" />
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+                <CardFooter className="justify-center border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-muted-foreground"
+                    onClick={() => {
+                      setStep({ mode: "signIn" });
+                      setError(null);
+                    }}
+                  >
+                    Back to sign in
+                  </Button>
+                </CardFooter>
+              </form>
+            </>
+          ) : (
+            <>
+              <CardHeader className="text-center">
+                <div className="mb-2 flex justify-center">
+                  <Lock className="size-9 text-brand" />
+                </div>
+                <CardTitle className="text-xl">Set a new password</CardTitle>
+                <CardDescription>
+                  Enter the code from your email, then choose a new password
+                  (min. 8 characters).
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleReset}>
+                <CardContent className="space-y-4 pb-4">
+                  <div className="flex justify-center">
+                    <InputOTP
+                      value={otp}
+                      onChange={setOtp}
+                      maxLength={6}
+                      disabled={isLoading}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && otp.length === 6 && !isLoading) {
+                          (e.target as HTMLElement).closest("form")?.requestSubmit();
+                        }
+                      }}
+                    >
+                      <InputOTPGroup>
+                        {Array.from({ length: 6 }).map((_, index) => (
+                          <InputOTPSlot key={index} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="new-password"
+                        name="newPassword"
+                        type={showPassword ? "text" : "password"}
+                        className="pl-9 pr-10"
+                        autoComplete="new-password"
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Toggle password visibility"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-new">Confirm new password</Label>
+                    <Input
+                      id="confirm-new"
+                      name="confirm"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {error && (
+                    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {error}
+                    </p>
+                  )}
+                  <Button type="submit" className="w-full" disabled={isLoading || otp.length !== 6}>
+                    {isLoading ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : (
+                      "Update password"
+                    )}
+                  </Button>
+                </CardContent>
+                <CardFooter className="justify-center border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={resendReset}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className="mr-2 size-4" />
+                    Resend code
                   </Button>
                 </CardFooter>
               </form>
             </>
           )}
 
-          <div className="py-4 px-6 text-xs text-center text-muted-foreground bg-muted border-t rounded-b-lg">
-            Secured by{" "}
-            <a
-              href="https://freebuff.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-primary transition-colors"
-            >
-              freebuff.com
-            </a>
+          <div className="border-t bg-muted/40 px-6 py-3 text-center text-xs text-muted-foreground">
+            <span className={cn("inline-flex items-center gap-1.5")}>
+              <ShieldCheck className="size-3.5" />
+              Secured by Freebuff
+            </span>
           </div>
         </Card>
-        </div>
       </div>
     </div>
   );
