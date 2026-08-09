@@ -7,6 +7,7 @@ import { useParams } from "react-router";
 /** Minimal chrome-free embed surface used by the iframe embed code. */
 export default function Embed() {
   const { publicId = "" } = useParams();
+  const autoFullscreen = new URLSearchParams(window.location.search).get("autofull") === "1";
   const payload = useQuery(api.videos.getEmbed, { publicId });
 
   if (payload === undefined) {
@@ -33,6 +34,7 @@ export default function Embed() {
         ads={payload.ads}
         branding={payload.branding}
         player={payload.player}
+        autoFullscreen={autoFullscreen}
         className="h-full rounded-none"
       />
     </div>

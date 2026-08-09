@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
@@ -148,8 +149,10 @@ function VideoDetailDialog({
   const [description, setDescription] = useState(video.description ?? "");
   const [saving, setSaving] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [autoFullEmbed, setAutoFullEmbed] = useState(false);
 
   const urls = videoUrls(video.publicId);
+  const embed = embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed });
 
   const save = async () => {
     setSaving(true);
@@ -372,11 +375,17 @@ function VideoDetailDialog({
 
             <TabsContent value="embed" className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Embed code</label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-medium">Embed code</label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    Start in fullscreen
+                    <Switch checked={autoFullEmbed} onCheckedChange={setAutoFullEmbed} />
+                  </label>
+                </div>
                 <pre className="max-h-40 overflow-auto rounded-lg border bg-muted/40 p-3 text-xs leading-5">
-                  {embedCode(video.publicId)}
+                  {embed}
                 </pre>
-                <CopyButton value={embedCode(video.publicId)} label="Copy embed code" />
+                <CopyButton value={embed} label="Copy embed code" />
               </div>
               <div className="grid gap-2 text-sm">
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">

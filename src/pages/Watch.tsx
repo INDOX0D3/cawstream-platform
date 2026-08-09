@@ -2,6 +2,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { VideoCard } from "@/components/VideoCard";
 import { Logo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,11 +11,13 @@ import { formatCompact, formatDate } from "@/lib/format";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, UserRound } from "lucide-react";
+import { useState } from "react";
 import { Link, useParams } from "react-router";
 
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
+  const [autoFullEmbed, setAutoFullEmbed] = useState(false);
   const payload = useQuery(api.videos.getWatch, { publicId });
   const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(
@@ -119,7 +122,18 @@ export default function Watch() {
               <Link2 className="mr-2 size-4" />
               Share
             </Button>
-            <CopyButton value={embedCode(video.publicId)} label="Embed" />
+            <label className="flex h-8 items-center gap-2 rounded-lg border px-2.5 text-xs text-muted-foreground">
+              <Switch
+                checked={autoFullEmbed}
+                onCheckedChange={setAutoFullEmbed}
+                className="scale-90"
+              />
+              Fullscreen
+            </label>
+            <CopyButton
+              value={embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed })}
+              label="Embed"
+            />
             <CopyButton value={window.location.href} label="Copy link" />
           </div>
 

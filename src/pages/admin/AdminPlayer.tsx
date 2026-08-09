@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { PLAYER_ACCENTS } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { Loader2, MonitorPlay } from "lucide-react";
@@ -25,6 +26,7 @@ interface PlayerForm {
   pictureInPicture: boolean;
   defaultVolume: number;
   showBranding: boolean;
+  accentColor: string;
 }
 
 export default function AdminPlayer() {
@@ -43,6 +45,7 @@ export default function AdminPlayer() {
         pictureInPicture: settings.player.pictureInPicture,
         defaultVolume: settings.player.defaultVolume,
         showBranding: settings.player.showBranding,
+        accentColor: settings.player.accentColor,
       });
     }
   }, [settings, form]);
@@ -114,11 +117,38 @@ export default function AdminPlayer() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label>Play button color</Label>
+            <Select value={form.accentColor} onValueChange={(v) => set("accentColor", v)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PLAYER_ACCENTS).map(([key, accent]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="size-3 rounded-full border border-black/20"
+                        style={{ background: accent.color }}
+                      />
+                      {accent.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The accent used by the custom player — play button, seek bar and
+              control icons.
+            </p>
+          </div>
+
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold">Native controls</p>
+              <p className="text-sm font-semibold">Player controls</p>
               <p className="text-xs text-muted-foreground">
-                Show play, seek and volume controls on the player.
+                Show the custom play, seek and volume bar on the player (the
+                accent-colored play button always appears).
               </p>
             </div>
             <Switch checked={form.controls} onCheckedChange={(v) => set("controls", v)} />

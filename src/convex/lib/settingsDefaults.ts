@@ -10,7 +10,12 @@ export interface PlayerSettings {
   pictureInPicture: boolean;
   defaultVolume: number; // 0..1
   showBranding: boolean;
+  /** Accent color for the custom player skin (play button, seek bar, controls). */
+  accentColor: string; // key from PLAYER_ACCENT_KEYS
 }
+
+/** Allowed player accent colors — must stay in sync with PLAYER_ACCENTS in VideoPlayer.tsx. */
+export const PLAYER_ACCENT_KEYS = ["yellow", "blue", "orange", "red", "green", "white"] as const;
 
 export interface BrandingSettings {
   watermarkEnabled: boolean;
@@ -48,6 +53,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   pictureInPicture: true,
   defaultVolume: 0.8,
   showBranding: true,
+  accentColor: "yellow",
 };
 
 export const DEFAULT_BRANDING: BrandingSettings = {

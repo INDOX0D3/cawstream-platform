@@ -6,6 +6,7 @@ import {
   DEFAULT_PLAYER_SETTINGS,
   DEFAULT_SITE,
   DEFAULT_SMTP,
+  PLAYER_ACCENT_KEYS,
   type BrandingSettings,
   type PlayerSettings,
   type SiteSettings,
@@ -117,6 +118,11 @@ export const updateSettings = mutation({
         pictureInPicture: Boolean(value.pictureInPicture ?? base.pictureInPicture),
         defaultVolume: Math.min(1, Math.max(0, Number(value.defaultVolume ?? base.defaultVolume) || 0)),
         showBranding: Boolean(value.showBranding ?? base.showBranding),
+        accentColor: PLAYER_ACCENT_KEYS.includes(
+          String(value.accentColor ?? base.accentColor) as (typeof PLAYER_ACCENT_KEYS)[number],
+        )
+          ? String(value.accentColor)
+          : base.accentColor,
       };
       await setSetting(ctx, "player", next);
       return next;

@@ -10,11 +10,16 @@ export function videoUrls(publicId: string) {
   };
 }
 
-export function embedCode(publicId: string, height = 500): string {
+export function embedCode(
+  publicId: string,
+  height = 500,
+  opts?: { autoFullscreen?: boolean },
+): string {
   const { embed } = videoUrls(publicId);
+  const src = opts?.autoFullscreen ? `${embed}?autofull=1` : embed;
   return [
     `<iframe`,
-    `    src="${embed}"`,
+    `    src="${src}"`,
     `    width="100%"`,
     `    height="${height}"`,
     `    frameborder="0"`,
