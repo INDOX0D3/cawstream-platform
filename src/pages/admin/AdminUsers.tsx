@@ -20,10 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useMutation, useQuery } from "convex/react";
-import { Ban, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -39,11 +40,14 @@ function initials(name: string): string {
 }
 
 export default function AdminUsers() {
+  const { user: me } = useAuth();
   const users = useQuery(api.admin.listUsers);
   const setUserStatus = useMutation(api.admin.setUserStatus);
+  const setUserRole = useMutation(api.admin.setUserRole);
   const deleteUser = useMutation(api.admin.deleteUser);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
 
   const toggleStatus = async (user: UserRow) => {
     setBusyId(user._id);
@@ -57,6 +61,19 @@ export default function AdminUsers() {
       toast.error(error instanceof Error ? error.message : "Could not update account");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const toggleRole = async (user: UserRow) => {
+    const promote = user.role !== "admin";
+    setBusyRoleId(user._id);
+    try {
+      await setUserRole({ userId: user._id, role: promote ? "admin" : "user" });
+      toast.success(promote ? "Promoted to administrator" : "Admin access removed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update role");
+    } finally {
+      setBusyRoleId(null);
     }
   };
 
@@ -151,6 +168,33 @@ export default function AdminUsers() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busyRoleId === user._id || user._id === me?._id}
+                        onClick={() => void toggleRole(user)}
+                        className={
+                          user.role === "admin"
+                            ? "text-amber-600 hover:text-amber-600"
+                            : "text-emerald-600 hover:text-emerald-600"
+                        }
+                        title={
+                          user._id === me?._id
+                            ? "You cannot change your own role"
+                            : user.role === "admin"
+                              ? "Remove admin access"
+                              : "Promote to admin"
+                        }
+                      >
+                        {busyRoleId === user._id ? (
+                          <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                        ) : user.role === "admin" ? (
+                          <ShieldOff className="mr-1.5 size-3.5" />
+                        ) : (
+                          <ShieldCheck className="mr-1.5 size-3.5" />
+                        )}
+                        {user.role === "admin" ? "Revoke" : "Make admin"}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
