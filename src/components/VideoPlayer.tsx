@@ -3,39 +3,56 @@
  *
  * Fully custom player skin — the browser's native controls are never shown:
  *  - Big accent-colored play button (color chosen in Admin → Player settings)
- *  - Custom control bar: play/pause, buffered seek bar, time, volume + mute,
- *    picture-in-picture and fullscreen — auto-hides while playing
- *  - Keyboard shortcuts (space/k play, ←/→ seek, ↑/↓ volume, m mute, f fullscreen)
- *  - Double-click toggles fullscreen
- *  - `autoFullscreen` requests fullscreen on load and retries on the first user
- *    gesture if the browser blocks it (used by `?autofull=1` embeds)
+ *  - Custom control bar: play/pause, buffered seek bar, time, picture-in-picture,
+ *    share, settings and fullscreen — auto-hides while playing
+ *  - Keyboard shortcuts (space/k play, ←/→ seek, f fullscreen)
+ *  - Share menu: copy link, copy embed code, native device share
+ *  - Settings menu: playback speed and HLS quality ladder
  *
  * Direct playback: plain <video> with the stored file URL.
- * Mux HLS playback: hls.js for browsers that need it, native HLS for Safari.
  * Server payload includes admin player settings, branding (watermark) and the
  * video owner's ad configuration — rendered by AdManager inside this player.
  * A view is recorded (hashed visitor id) the first time playback actually
  * starts. Never on a paused or failed video.
  */
 import { AdManager, type AdsConfig } from "@/components/AdManager";
+import { copyText } from "@/components/CopyButton";
 import { api } from "@/convex/_generated/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMutation } from "convex/react";
 import Hls from "hls.js";
 import {
   AlertTriangle,
+  Code2,
+  Link2,
   Loader2,
   Maximize,
   Minimize,
   Pause,
   PictureInPicture2,
   Play,
-  Volume2,
-  VolumeX,
+  Settings,
+  Share,
+  Share2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import { toast } from "sonner";
 import { formatDuration } from "@/lib/format";
 import { getVisitorId } from "@/lib/visitor";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,6 +72,8 @@ export const PLAYER_ACCENTS: Record<
 };
 
 const DEFAULT_ACCENT = "yellow";
+
+const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
 export interface PlayerVideo {
   _id: string;
@@ -144,10 +163,10 @@ export function VideoPlayer({
   const seekBarRef = useRef<HTMLDivElement | null>(null);
   const hideTimer = useRef<number | null>(null);
   const lastClick = useRef(0);
-  const lastVolume = useRef(player.defaultVolume);
   const recorded = useRef(false);
   const autoFullscreenDone = useRef(false);
   const userLeftFullscreen = useRef(false);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -155,13 +174,15 @@ export function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bufferedEnd, setBufferedEnd] = useState(0);
-  const [volume, setVolume] = useState(player.defaultVolume);
-  const [muted, setMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPip, setIsPip] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
   const [controlsShown, setControlsShown] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [speed, setSpeed] = useState(() => userPrefs?.defaultSpeed ?? 1);
+  const [levels, setLevels] = useState<Array<{ height?: number; width?: number }>>([]);
+  const [currentLevel, setCurrentLevel] = useState(-1);
   const recordView = useMutation(api.views.recordView);
 
   const isReady = video.status === "ready";
@@ -187,6 +208,7 @@ export function VideoPlayer({
 
     if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, maxBufferLength: 30 });
+      hlsRef.current = hls;
       hls.loadSource(hlsSrc);
       hls.attachMedia(el);
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -194,12 +216,16 @@ export function VideoPlayer({
           setLoadError("This stream could not be loaded right now.");
         }
       });
-      // Apply the admin default quality: auto ladder or source (highest).
+      // Expose the quality ladder and apply the admin default (auto or source).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (player.defaultQuality === "source" && hls) {
+        if (!hls) return;
+        setLevels(hls.levels.map((l) => ({ height: l.height, width: l.width })));
+        if (player.defaultQuality === "source" && hls.levels.length > 0) {
           hls.currentLevel = hls.levels.length - 1;
-        } else if (hls) {
+          setCurrentLevel(hls.levels.length - 1);
+        } else {
           hls.currentLevel = -1;
+          setCurrentLevel(-1);
         }
       });
     } else if (el.canPlayType("application/vnd.apple.mpegurl")) {
@@ -209,20 +235,17 @@ export function VideoPlayer({
     }
     return () => {
       hls?.destroy();
+      hlsRef.current = null;
     };
   }, [isReady, hlsSrc, player.defaultQuality]);
 
-  // Progress / volume / buffering state from the <video> element.
+  // Progress / buffering state from the <video> element.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     const onTime = () => setCurrentTime(el.currentTime);
     const onProgress = () => {
       if (el.buffered.length) setBufferedEnd(el.buffered.end(el.buffered.length - 1));
-    };
-    const onVolume = () => {
-      setVolume(el.volume);
-      setMuted(el.muted);
     };
     const onDuration = () => {
       if (Number.isFinite(el.duration)) setDuration(el.duration);
@@ -231,14 +254,12 @@ export function VideoPlayer({
     const onLeavePip = () => setIsPip(false);
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("progress", onProgress);
-    el.addEventListener("volumechange", onVolume);
     el.addEventListener("durationchange", onDuration);
     el.addEventListener("enterpictureinpicture", onEnterPip);
     el.addEventListener("leavepictureinpicture", onLeavePip);
     return () => {
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("progress", onProgress);
-      el.removeEventListener("volumechange", onVolume);
       el.removeEventListener("durationchange", onDuration);
       el.removeEventListener("enterpictureinpicture", onEnterPip);
       el.removeEventListener("leavepictureinpicture", onLeavePip);
@@ -308,20 +329,37 @@ export function VideoPlayer({
   useEffect(() => {
     if (!player.controls) return;
     setControlsShown(true);
-    if (!playing) return;
+    if (!playing || menuOpen) return;
     hideTimer.current = window.setTimeout(() => setControlsShown(false), 2800);
     return () => {
       if (hideTimer.current) window.clearTimeout(hideTimer.current);
     };
-  }, [playing, player.controls]);
+  }, [playing, player.controls, menuOpen]);
 
   const pokeControls = () => {
     if (!player.controls) return;
     setControlsShown(true);
     if (hideTimer.current) window.clearTimeout(hideTimer.current);
-    if (playing) {
+    if (playing && !menuOpen) {
       hideTimer.current = window.setTimeout(() => setControlsShown(false), 2800);
     }
+  };
+
+  const onMenuOpenChange = (open: boolean) => {
+    setMenuOpen(open);
+    if (open) {
+      setControlsShown(true);
+      if (hideTimer.current) window.clearTimeout(hideTimer.current);
+    } else if (playing) {
+      setControlsShown(true);
+      hideTimer.current = window.setTimeout(() => setControlsShown(false), 2800);
+    }
+  };
+
+  const copyToClipboard = async (value: string, message: string) => {
+    const ok = await copyText(value);
+    if (ok) toast.success(message);
+    else toast.error("Could not copy — select and copy manually.");
   };
 
   const togglePlay = useCallback(() => {
@@ -361,29 +399,6 @@ export function VideoPlayer({
     if (now - lastClick.current < 300) return; // ignore the first click of a double-click
     lastClick.current = now;
     togglePlay();
-  };
-
-  const changeVolume = (next: number) => {
-    const el = videoRef.current;
-    if (!el) return;
-    const clamped = Math.min(1, Math.max(0, next));
-    el.volume = clamped;
-    if (clamped > 0) {
-      lastVolume.current = clamped;
-      el.muted = false;
-    }
-  };
-
-  const toggleMute = () => {
-    const el = videoRef.current;
-    if (!el) return;
-    if (el.muted || el.volume === 0) {
-      el.volume = lastVolume.current || 0.8;
-      el.muted = false;
-    } else {
-      lastVolume.current = el.volume;
-      el.muted = true;
-    }
   };
 
   const handlePlaying = () => {
@@ -444,6 +459,7 @@ export function VideoPlayer({
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (menuOpen) return; // let the settings/share menus handle keys
       const videoEl = videoRef.current;
       if (!videoEl) return;
       switch (e.key) {
@@ -461,18 +477,6 @@ export function VideoPlayer({
           e.preventDefault();
           videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
           break;
-        case "ArrowUp":
-          e.preventDefault();
-          videoEl.volume = Math.min(1, videoEl.volume + 0.1);
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          videoEl.volume = Math.max(0, videoEl.volume - 0.1);
-          break;
-        case "m":
-        case "M":
-          videoEl.muted = !videoEl.muted;
-          break;
         case "f":
         case "F":
           toggleFullscreen();
@@ -481,7 +485,7 @@ export function VideoPlayer({
     };
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
-  }, [togglePlay, toggleFullscreen]);
+  }, [togglePlay, toggleFullscreen, menuOpen]);
 
   // Watermark overlay placement.
   const margin = branding.watermarkMargin;
@@ -593,8 +597,6 @@ export function VideoPlayer({
           const el = e.currentTarget;
           const next = Math.min(1, Math.max(0, userPrefs?.defaultVolume ?? player.defaultVolume));
           el.volume = next;
-          lastVolume.current = next;
-          setVolume(next);
           el.defaultPlaybackRate = defaultSpeed;
         }}
         onError={() => {
@@ -704,30 +706,105 @@ export function VideoPlayer({
                 </button>
               )}
 
-              <button
-                type="button"
-                aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
-                onClick={toggleMute}
-                className={ICON_BTN}
-              >
-                {muted || volume === 0 ? (
-                  <VolumeX className="size-4" />
-                ) : (
-                  <Volume2 className="size-4" />
-                )}
-              </button>
+              {/* Share */}
+              <DropdownMenu onOpenChange={onMenuOpenChange}>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Share video" className={ICON_BTN}>
+                    <Share2 className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuContent side="top" align="end" className="w-60">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        copyToClipboard(videoUrls(video.publicId).watch, "Video link copied")
+                      }
+                    >
+                      <Link2 className="mr-2 size-4" />
+                      Copy video link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => copyToClipboard(embedCode(video.publicId), "Embed code copied")}
+                    >
+                      <Code2 className="mr-2 size-4" />
+                      Copy embed code
+                    </DropdownMenuItem>
+                    {typeof navigator !== "undefined" && "share" in navigator && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            void navigator
+                              .share({ title: video.title, url: videoUrls(video.publicId).watch })
+                              .catch(() => undefined);
+                          }}
+                        >
+                          <Share className="mr-2 size-4" />
+                          Share with device…
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenuPortal>
+              </DropdownMenu>
 
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={(e) => changeVolume(Number(e.target.value))}
-                aria-label="Volume"
-                className="h-1 w-14 cursor-pointer sm:w-20"
-                style={{ accentColor: accent.color }}
-              />
+              {/* Settings */}
+              <DropdownMenu onOpenChange={onMenuOpenChange}>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Player settings" className={ICON_BTN}>
+                    <Settings className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuContent side="top" align="end" className="w-56">
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>Playback speed</DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuRadioGroup
+                            value={String(speed)}
+                            onValueChange={(v) => {
+                              const next = Number(v);
+                              setSpeed(next);
+                              if (videoRef.current) videoRef.current.playbackRate = next;
+                            }}
+                          >
+                            {PLAYBACK_SPEEDS.map((s) => (
+                              <DropdownMenuRadioItem key={s} value={String(s)}>
+                                {s}×
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                    {levels.length > 0 && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Quality</DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup
+                              value={String(currentLevel)}
+                              onValueChange={(v) => {
+                                const idx = Number(v);
+                                setCurrentLevel(idx);
+                                if (hlsRef.current) hlsRef.current.currentLevel = idx;
+                              }}
+                            >
+                              <DropdownMenuRadioItem value="-1">Auto</DropdownMenuRadioItem>
+                              {levels.map((l, i) => (
+                                <DropdownMenuRadioItem key={`${l.height ?? "?"}-${i}`} value={String(i)}>
+                                  {l.height ? `${l.height}p` : `Level ${i + 1}`}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenuPortal>
+              </DropdownMenu>
 
               <button
                 type="button"
