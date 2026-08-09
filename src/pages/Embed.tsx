@@ -7,11 +7,12 @@ import { useParams } from "react-router";
 /**
  * Minimal chrome-free embed surface used by the iframe embed code.
  *
- * Fullscreen by default: the player goes fullscreen as soon as the page is
- * opened — no need to click the fullscreen button. Browsers only allow
- * fullscreen after a user gesture, so the player also enters fullscreen on
- * the very first tap/click (including pressing play). Append ?autofull=0 to
- * the embed URL to opt out of auto-fullscreen.
+ * Fullscreen by default: the page fills the entire viewport edge-to-edge
+ * (fixed inset-0, black) so opening the URL already looks like a fullscreen
+ * video — no web chrome, no page background. The player also requests the
+ * native fullscreen API on load; browsers only allow that after a user
+ * gesture, so it re-enters fullscreen on the very first tap/click
+ * (including pressing play). Append ?autofull=0 to opt out.
  */
 export default function Embed() {
   const { publicId = "" } = useParams();
@@ -21,7 +22,7 @@ export default function Embed() {
 
   if (payload === undefined) {
     return (
-      <div className="flex h-full min-h-[200px] w-full items-center justify-center bg-black">
+      <div className="fixed inset-0 z-0 flex items-center justify-center bg-black">
         <Loader2 className="size-6 animate-spin text-white/60" />
       </div>
     );
@@ -29,7 +30,7 @@ export default function Embed() {
 
   if (payload === null) {
     return (
-      <div className="flex h-full min-h-[200px] w-full flex-col items-center justify-center gap-2 bg-black px-4 text-center">
+      <div className="fixed inset-0 z-0 flex flex-col items-center justify-center gap-2 bg-black px-4 text-center">
         <PlayCircle className="size-8 text-white/40" />
         <p className="text-xs text-white/60">This video is unavailable</p>
       </div>
@@ -37,14 +38,15 @@ export default function Embed() {
   }
 
   return (
-    <div className="h-full w-full bg-black">
+    <div className="fixed inset-0 z-0 bg-black">
       <VideoPlayer
         video={payload.video}
         ads={payload.ads}
         branding={payload.branding}
         player={payload.player}
         autoFullscreen={autoFullscreen}
-        className="h-full rounded-none"
+        fill
+        className="h-full w-full rounded-none"
       />
     </div>
   );

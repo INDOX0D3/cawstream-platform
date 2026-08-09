@@ -127,6 +127,7 @@ export function VideoPlayer({
   userPrefs,
   className,
   autoFullscreen = false,
+  fill = false,
 }: {
   video: PlayerVideo;
   ads: AdsConfig;
@@ -135,6 +136,8 @@ export function VideoPlayer({
   userPrefs?: PlayerUserPrefs;
   className?: string;
   autoFullscreen?: boolean;
+  /** Fill the whole container (viewport) edge-to-edge instead of a fixed aspect box. */
+  fill?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -498,7 +501,7 @@ export function VideoPlayer({
         ref={containerRef}
         className={cn(
           "relative w-full overflow-hidden rounded-lg bg-black",
-          ASPECT_CLASSES[player.aspectRatio] ?? "aspect-video",
+          fill ? "h-full" : (ASPECT_CLASSES[player.aspectRatio] ?? "aspect-video"),
           className,
         )}
       >
@@ -543,7 +546,7 @@ export function VideoPlayer({
       onPointerDown={pokeControls}
       className={cn(
         "group relative w-full overflow-hidden rounded-lg bg-black outline-none",
-        ASPECT_CLASSES[player.aspectRatio] ?? "aspect-video",
+        fill ? "h-full" : (ASPECT_CLASSES[player.aspectRatio] ?? "aspect-video"),
         className,
       )}
     >
@@ -574,7 +577,7 @@ export function VideoPlayer({
         ref={videoRef}
         src={src ?? undefined}
         poster={video.thumbnailUrl ?? undefined}
-        className="size-full"
+        className={cn("size-full", fill && "object-cover")}
         playsInline
         autoPlay={autoplay}
         muted={autoplay}
