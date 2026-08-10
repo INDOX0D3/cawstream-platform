@@ -4,9 +4,8 @@
  * The static <head> in index.html carries the site-wide defaults; once a video
  * loads we override the title + og:/twitter: tags with the real video data.
  * This covers browsers and crawlers that render JavaScript (Google, Facebook,
- * X/Twitter, LinkedIn, Discord, Telegram). For platforms that don't execute
- * JS (WhatsApp, iMessage, Slack) the /og/{publicId} page — fully static HTML
- * from the Convex HTTP router — is the shareable preview link instead.
+ * X/Twitter, LinkedIn, Discord, Telegram). Every /v/ and /e/ page sets the
+ * play-button thumbnail as og:image, so pasted links preview as a video card.
  */
 
 export interface VideoMeta {

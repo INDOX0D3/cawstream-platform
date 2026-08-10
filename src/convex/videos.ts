@@ -52,7 +52,7 @@ export const prepareUpload = mutation({
     const user = await requireUser(ctx);
 
     // A title is mandatory — it powers the watch page, embed titles and the
-    // social preview cards.
+    // link previews.
     const safeTitle = sanitizeTitle(title);
     if (!title.trim()) {
       throw new Error("Please enter a title before uploading.");
@@ -514,7 +514,7 @@ async function buildEmbedPayload(ctx: MediaCtx, video: VideoDoc) {
     ads,
     player,
     branding,
-    site: { name: site.name, supportEmail: site.supportEmail, siteUrl: site.siteUrl },
+    site: { name: site.name, supportEmail: site.supportEmail },
   };
 }
 
@@ -551,9 +551,9 @@ export const getWatch = query({
 });
 
 /**
- * Public: related videos for the watch page. Same-owner ready videos come
- * first; if there aren't enough, the grid is filled with recent ready videos
- * from other creators. Never exposes owner or storage ids.
+ * Public: related videos for the watch page. Only ready videos from the same
+ * owner are shown — other creators' videos are never mixed in. Never exposes
+ * owner or storage ids.
  */
 export const listMoreFrom = query({
   args: { publicId: v.string(), limit: v.optional(v.number()) },
@@ -573,23 +573,6 @@ export const listMoreFrom = query({
       .order("desc")
       .take(max + 1);
     const items = owned.filter((v) => v.publicId !== publicId).slice(0, max);
-
-    // Fill the grid with recent ready videos from other creators.
-    if (items.length < 3) {
-      const others = await ctx.db
-        .query("videos")
-        .withIndex("by_status", (q) => q.eq("status", "ready"))
-        .order("desc")
-        .take(max - items.length + 1);
-      const seen = new Set(items.map((v) => v.publicId));
-      for (const v of others) {
-        if (v.publicId !== publicId && !seen.has(v.publicId)) {
-          items.push(v);
-          seen.add(v.publicId);
-        }
-        if (items.length >= max) break;
-      }
-    }
 
     const withThumbs = await withMedia(ctx, items);
     return withThumbs.map((v) => ({
@@ -646,24 +629,3 @@ export const resolveThumb = query({
   },
 });
 
-/** HTTP action helper: resolve the social-preview poster (thumbnail with the
- *  play-button overlay) for /poster/{publicId}.jpg. Falls back to the regular
- *  thumbnail so old videos still preview. */
-export const resolvePoster = query({
-  args: { publicId: v.string() },
-  handler: async (ctx, { publicId }) => {
-    const video = await ctx.db
-      .query("videos")
-      .withIndex("by_publicId", (q) => q.eq("publicId", publicId))
-      .first();
-    if (!video || video.archivedAt) return null;
-    if (video.socialThumbnailStorageId) {
-      const url = await ctx.storage.getUrl(video.socialThumbnailStorageId);
-      if (url) return url;
-    }
-    if (video.thumbnailStorageId) {
-      return await ctx.storage.getUrl(video.thumbnailStorageId);
-    }
-    return video.thumbnailUrl ?? null;
-  },
-});

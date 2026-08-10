@@ -126,8 +126,8 @@ export function extractMetadata(file: File): Promise<VideoMetadata> {
   });
 }
 
-/** Draw a play-button overlay onto a captured frame (the “cloaked” look used
- *  for social previews: thumbnail with a play logo so it reads as a video). */
+/** Draw a play-button overlay onto a captured frame (the “cloaked” look:
+ *  thumbnail with a play logo so it reads as a video in link previews). */
 function drawPlayOverlay(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -164,7 +164,7 @@ function drawPlayOverlay(
 
 /** Capture a real frame from the file as a JPEG blob (used as the thumbnail).
  *  Pass `overlayPlay = true` to composite a play-button badge onto the frame
- *  (the social-preview poster). */
+ *  (the cloaked link-preview poster). */
 export function generateThumbnail(
   file: File,
   seekToSeconds = 1,
@@ -227,8 +227,8 @@ export function generateThumbnail(
   });
 }
 
-/** High-res thumbnail composited with a play-button overlay — used as the
- *  og:image / poster so pasted links preview as videos on X, WhatsApp, FB, etc. */
+/** High-res thumbnail composited with a play-button overlay — the og:image
+ *  used by /v/ and /e/ so pasted links preview as videos on X, WhatsApp, FB. */
 export function generateSocialThumbnail(file: File): Promise<Blob> {
   return generateThumbnail(file, 1, 1280, true);
 }

@@ -36,7 +36,6 @@ import Hls from "hls.js";
 import {
   AlertTriangle,
   Code2,
-  Globe,
   Link2,
   Loader2,
   Maximize,
@@ -54,7 +53,7 @@ import { toast } from "sonner";
 import { formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { getVisitorId, viewProof } from "@/lib/visitor";
-import { embedCode, socialPreviewUrl, videoUrls } from "@/lib/embed";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -735,14 +734,6 @@ export function VideoPlayer({
                     >
                       <Code2 className="mr-2 size-4" />
                       {t("player.copyEmbed")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        copyToClipboard(socialPreviewUrl(video.publicId), t("player.socialCopied"))
-                      }
-                    >
-                      <Globe className="mr-2 size-4" />
-                      {t("player.copySocial")}
                     </DropdownMenuItem>
                     {typeof navigator !== "undefined" && "share" in navigator && (
                       <>

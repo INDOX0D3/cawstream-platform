@@ -43,10 +43,6 @@ export interface SmtpSettings {
 export interface SiteSettings {
   name: string;
   supportEmail: string;
-  /** Public origin of the app (e.g. https://videos.example.com). Used as the
-   *  base for social-preview “Watch now” links. Optional — falls back to the
-   *  request origin when unset. */
-  siteUrl: string;
 }
 
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
@@ -86,7 +82,6 @@ export const DEFAULT_SMTP: SmtpSettings = {
 export const DEFAULT_SITE: SiteSettings = {
   name: "CawStream",
   supportEmail: "",
-  siteUrl: "",
 };
 
 export const SETTING_KEYS = {

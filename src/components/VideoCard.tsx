@@ -8,7 +8,7 @@ import {
 import { videoUrls } from "@/lib/embed";
 import { formatCompact, formatDuration, formatRelative } from "@/lib/format";
 import { useI18n, type DictKey } from "@/lib/i18n";
-import { Eye, ImageIcon, Link2, Pencil, Play, Share2 } from "lucide-react";
+import { Eye, ImageIcon, Link2, Pencil, Play } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 
@@ -24,9 +24,9 @@ export interface VideoCardVideo {
   error?: string | null;
 }
 
-/** Popover with the ready-to-copy output links for a video (embed link, social
- *  preview link and thumbnail link). Rendered inside the card when `showLinks`
- *  is set — used on the My Videos grid. */
+/** Popover with the ready-to-copy output links for a video (embed link and
+ *  thumbnail link). Rendered inside the card when `showLinks` is set — used
+ *  on the My Videos grid. */
 function CopyLinksPopover({ publicId }: { publicId: string }) {
   const { t } = useI18n();
   const urls = videoUrls(publicId);
@@ -36,12 +36,6 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
       labelKey: "card.embedLink" as DictKey,
       hintKey: "card.embedHint" as DictKey,
       value: urls.embed,
-    },
-    {
-      icon: <Share2 className="size-3.5" />,
-      labelKey: "card.socialLink" as DictKey,
-      hintKey: "card.socialHint" as DictKey,
-      value: urls.social,
     },
     {
       icon: <ImageIcon className="size-3.5" />,

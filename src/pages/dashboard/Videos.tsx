@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
-import { embedCode, socialPreviewUrl, videoUrls } from "@/lib/embed";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
@@ -432,21 +432,7 @@ function VideoDetailDialog({
                     <CopyButton value={urls.thumb} size="icon" label={t("videos.copyThumbUrl")} />
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="truncate text-muted-foreground">{t("videos.socialPreview")}</span>
-                  <span className="flex items-center gap-2">
-                    <code className="max-w-[220px] truncate text-xs">
-                      {socialPreviewUrl(video.publicId)}
-                    </code>
-                    <CopyButton
-                      value={socialPreviewUrl(video.publicId)}
-                      size="icon"
-                      label={t("videos.copySocialUrl")}
-                    />
-                  </span>
-                </div>
               </div>
-              <p className="text-xs text-muted-foreground">{t("videos.socialHint")}</p>
             </TabsContent>
           </Tabs>
         </DialogContent>

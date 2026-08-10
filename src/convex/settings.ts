@@ -181,7 +181,6 @@ export const updateSettings = mutation({
       const next: SiteSettings = {
         name: String(value.name ?? base.name).slice(0, 60) || "CawStream",
         supportEmail: String(value.supportEmail ?? base.supportEmail ?? "").slice(0, 255),
-        siteUrl: String(value.siteUrl ?? base.siteUrl ?? "").slice(0, 255),
       };
       await setSetting(ctx, "site", next);
       return next;
