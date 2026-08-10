@@ -191,80 +191,7 @@ const en = {
     "Tip: paste the social preview link in WhatsApp, X or Facebook to show a video card with a play-button thumbnail — no JavaScript needed.",
 
   // player preferences (dashboard)
-  "playerPrefs.title": "Preferensi player",
-  "playerPrefs.desc":
-    "Berlaku saat Anda menonton video apa pun di CawStream — tidak pernah memengaruhi yang dilihat penonton Anda.",
-  "playerPrefs.autoplay": "Putar otomatis",
-  "playerPrefs.autoplayDesc": "Mulai memutar otomatis saat Anda membuka video.",
-  "playerPrefs.volume": "Volume bawaan",
-  "playerPrefs.speed": "Kecepatan putar bawaan",
-  "playerPrefs.speedDesc": "Kecepatan awal saat video baru diputar.",
-  "playerPrefs.watermark": "Tampilkan watermark",
-  "playerPrefs.watermarkDesc": "Tampilkan watermark platform pada video yang Anda tonton.",
-  "playerPrefs.save": "Simpan preferensi",
-  "playerPrefs.saved": "Preferensi player disimpan",
-
-  // profile
-  "profile.displayName": "Nama tampilan",
-  "profile.username": "Nama pengguna",
-  "profile.taken": "Nama pengguna itu sudah dipakai.",
-  "profile.save": "Simpan profil",
-  "profile.updated": "Profil diperbarui",
-  "profile.accountDetails": "Detail akun",
-  "profile.email": "Email",
-  "profile.verified": "Terverifikasi",
-  "profile.unverified": "Belum verifikasi",
-  "profile.role": "Peran",
-  "profile.administrator": "Administrator",
-  "profile.member": "Anggota",
-  "profile.memberSince": "Anggota sejak",
-  "profile.noEmail": "Tidak ada email di akun ini",
-
-  // security
-  "security.changePassword": "Ubah kata sandi",
-  "security.changeDesc":
-    "Mengubah kata sandi akan mengeluarkan semua perangkat lain sambil tetap masuk di perangkat ini. Kata sandi disimpan sebagai hash Scrypt — tidak pernah dalam teks biasa.",
-  "security.passwordUpdated": "Kata sandi diperbarui",
-  "security.passwordUpdatedDesc": "Gunakan kata sandi baru Anda saat masuk dari perangkat lain.",
-  "security.changeAgain": "Ubah lagi",
-  "security.currentPassword": "Kata sandi saat ini",
-  "security.newPassword": "Kata sandi baru",
-  "security.confirmNewPassword": "Konfirmasi kata sandi baru",
-  "security.updatePassword": "Perbarui kata sandi",
-  "security.accountSecurity": "Keamanan akun",
-  "security.emailVerified":
-    "Verifikasi email diperlukan sebelum dashboard dapat digunakan ({status}).",
-  "security.rateLimited":
-    "Percobaan masuk yang gagal dibatasi dan kode verifikasi kedaluwarsa dalam hitungan menit.",
-  "security.sessions":
-    "Sesi adalah pasangan JWT + refresh token berumur pendek yang terbatas pada deployment ini.",
-  "security.minLength": "Minimal 8 karakter.",
-  "security.tooShort": "Terlalu pendek.",
-  "security.mismatch": "Kata sandi tidak cocok.",
-  "security.changed": "Kata sandi diubah — perangkat lain sudah dikeluarkan",
-
-  // advertisements
-  "ads.title": "Monetisasi video Anda",
-  "ads.desc":
-    "Iklan diambil dari akun Anda saat penonton memutar video Anda — perbarui sekali dan semua embed yang ada otomatis memakainya.",
-  "ads.smartlink": "Smartlink",
-  "ads.smartlinkDesc":
-    "Membuka link Anda sekali, saat pemutaran dimulai. Cocok untuk mengarahkan penonton ke situs atau aplikasi Anda.",
-  "ads.destUrl": "URL tujuan",
-  "ads.socialBar": "Social bar",
-  "ads.socialBarDesc":
-    "Banner yang bisa ditutup di atas player. Kode Anda berjalan di iframe sandbox dan tidak pernah menyentuh aplikasi.",
-  "ads.bannerCode": "Kode banner",
-  "ads.popunder": "Popunder",
-  "ads.popunderDesc":
-    "Muncul sekali saat interaksi pertama dengan player, di jendela terpisah yang tidak pernah menyentuh sesi Anda.",
-  "ads.adCode": "Kode iklan",
-  "ads.note": "Iklan hanya muncul di halaman tonton publik dan embed Anda.",
-  "ads.save": "Simpan pengaturan iklan",
-  "ads.saved": "Pengaturan iklan disimpan — aktif di semua embed Anda",
-
-  // watch page + player
-  "watch.notFound": "Video tidak ditemukan",
+  "playerPrefs.title": "Player preferences",
   "playerPrefs.desc":
     "These apply when you watch any video on CawStream — they never affect what your own viewers see.",
   "playerPrefs.autoplay": "Autoplay",
@@ -650,6 +577,20 @@ const id: Partial<Record<DictKey, string>> = {
   "upload.browserPipeline": "Browser",
 
   // my videos
+  // player preferences (dashboard)
+  "playerPrefs.title": "Preferensi pemutar",
+  "playerPrefs.desc":
+    "Berlaku saat Anda menonton video apa pun di CawStream — tidak memengaruhi tampilan video milik Anda sendiri.",
+  "playerPrefs.autoplay": "Putar otomatis",
+  "playerPrefs.autoplayDesc": "Mulai putar otomatis saat Anda membuka video.",
+  "playerPrefs.volume": "Volume default",
+  "playerPrefs.speed": "Kecepatan putar default",
+  "playerPrefs.speedDesc": "Kecepatan awal video baru diputar.",
+  "playerPrefs.watermark": "Tampilkan watermark",
+  "playerPrefs.watermarkDesc": "Menampilkan watermark platform pada video yang Anda tonton.",
+  "playerPrefs.save": "Simpan preferensi",
+  "playerPrefs.saved": "Preferensi pemutar disimpan",
+
   "videos.all": "Semua",
   "videos.ready": "Siap",
   "videos.processing": "Diproses",
@@ -972,7 +913,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       let text = DICTS[lang][key] ?? en[key] ?? key;
       if (vars) {
         for (const [k, v] of Object.entries(vars)) {
-          text = text.replaceAll(`{${k}}`, String(v));
+          text = text.split(`{${k}}`).join(String(v));
         }
       }
       return text;

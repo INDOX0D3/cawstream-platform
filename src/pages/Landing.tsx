@@ -135,7 +135,7 @@ function Pipeline() {
             <span className="flex size-6 items-center justify-center rounded-full bg-brand/20 text-brand">
               <Icon className="size-3.5" />
             </span>
-            <span className="font-medium text-white/90">{t(label)}</span>
+            <span className="font-medium text-white/90">{t(label as DictKey)}</span>
           </div>
           {i < stages.length - 1 && <ArrowRight className="size-4 text-white/30" />}
         </div>
@@ -334,8 +334,8 @@ export default function Landing() {
                 className="relative rounded-2xl border border-white/8 bg-[#0b0b0c] p-6"
               >
                 <span className="text-sm font-semibold text-brand">{n}</span>
-                <h3 className="mt-2 text-lg font-semibold">{t(title)}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/55">{t(text)}</p>
+                <h3 className="mt-2 text-lg font-semibold">{t(title as DictKey)}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/55">{t(text as DictKey)}</p>
               </motion.div>
             ))}
           </div>
