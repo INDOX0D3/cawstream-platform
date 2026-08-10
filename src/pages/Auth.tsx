@@ -1,4 +1,5 @@
 import { CawMark, Logo } from "@/components/brand";
+import { PricingCards } from "@/components/Pricing";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,8 +18,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { useMutation } from "convex/react";
 import {
+  ArrowLeft,
   ArrowRight,
   AtSign,
   Eye,
@@ -49,6 +52,7 @@ function resolveRedirectAfterAuth(returnTo: string | null, fallback = "/dashboar
 
 type Step =
   | { mode: "signIn" }
+  | { mode: "plans" }
   | { mode: "signUp" }
   | {
       mode: "verify";
@@ -61,25 +65,14 @@ type Step =
   | { mode: "reset"; email: string };
 
 const BULLETS = [
-  {
-    icon: Zap,
-    title: "Instant uploads",
-    text: "Files are verified by their real bytes and processed right in your browser.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Secure by default",
-    text: "Scrypt-hashed passwords, expiring verification codes and rate-limited sign-ins.",
-  },
-  {
-    icon: RefreshCw,
-    title: "Mux-ready",
-    text: "Drop in your Mux keys and every new upload becomes cloud-transcoded HLS.",
-  },
-];
+  { icon: Zap, title: "auth.bullet1Title", text: "auth.bullet1Text" },
+  { icon: ShieldCheck, title: "auth.bullet2Title", text: "auth.bullet2Text" },
+  { icon: RefreshCw, title: "auth.bullet3Title", text: "auth.bullet3Text" },
+] as const;
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const { t } = useI18n();
   const completeSignup = useMutation(api.users.completeSignup);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -166,9 +159,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (/already/i.test(message)) {
-        setError(
-          "An account with this email already exists — sign in instead, or use “Forgot password”.",
-        );
+        setError(t("auth.alreadyExists"));
       } else {
         fail(err, "Could not create your account.");
       }
@@ -192,8 +183,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           try {
             await completeSignup({ username: step.username });
           } catch (err) {
-            // Account is verified but the username claim failed — surface it,
-            // the profile page can fix it.
             toast.error(
               err instanceof Error ? err.message : "Could not finalize your username.",
             );
@@ -218,7 +207,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setError(null);
     try {
       await signIn("password", { flow: "signIn", email: step.email, password: step.password });
-      toast.success("A new code is on its way");
+      toast.success(t("auth.newCode"));
     } catch (err) {
       fail(err, "Could not resend the code.");
     } finally {
@@ -276,7 +265,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         setOtp("");
         setIsLoading(false);
       } else {
-        toast.success("Password updated — you’re signed in");
+        toast.success(t("auth.verifiedSignedIn"));
         setIsLoading(false);
         // navigation happens via the authenticated effect
       }
@@ -292,7 +281,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setError(null);
     try {
       await signIn("password", { flow: "reset", email: step.email });
-      toast.success("A new code is on its way");
+      toast.success(t("auth.newCode"));
     } catch {
       setError("Could not resend the code.");
     } finally {
@@ -308,10 +297,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           <Logo className="text-foreground" />
           <div>
             <h2 className="text-3xl font-semibold leading-tight tracking-tight">
-              Own your video stack — from upload to embed.
+              {t("auth.heading")}
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              One account, real processing, real analytics, real embed codes.
+              {t("auth.subheading")}
             </p>
           </div>
           <div className="space-y-4">
@@ -321,8 +310,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   <Icon className="size-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-medium">{title}</p>
-                  <p className="text-xs leading-5 text-muted-foreground">{text}</p>
+                  <p className="text-sm font-medium">{t(title)}</p>
+                  <p className="text-xs leading-5 text-muted-foreground">{t(text)}</p>
                 </div>
               </div>
             ))}
@@ -330,20 +319,57 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         </div>
 
         {/* Form card */}
-        <Card className="w-full max-w-md border shadow-lg shadow-black/5">
-          {step.mode === "signIn" || step.mode === "signUp" ? (
+        <Card
+          className={cn(
+            "w-full border shadow-lg shadow-black/5",
+            step.mode === "plans" ? "max-w-2xl" : "max-w-md",
+          )}
+        >
+          {step.mode === "plans" ? (
+            <>
+              <CardHeader className="text-center">
+                <div className="mb-2 flex justify-center">
+                  <CawMark className="size-10 rounded-xl bg-foreground p-2 text-background" />
+                </div>
+                <CardTitle className="text-xl">{t("auth.choosePlan")}</CardTitle>
+                <CardDescription>{t("auth.choosePlanDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="pb-2">
+                <PricingCards
+                  onFree={() => {
+                    setStep({ mode: "signUp" });
+                    setError(null);
+                  }}
+                  compact
+                />
+              </CardContent>
+              <CardFooter className="flex-col gap-3 border-t pt-4">
+                <p className="text-sm text-muted-foreground">
+                  {t("auth.haveAccount")}{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep({ mode: "signIn" });
+                      setError(null);
+                    }}
+                    className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-brand"
+                  >
+                    {t("auth.signIn")}
+                  </button>
+                </p>
+              </CardFooter>
+            </>
+          ) : step.mode === "signIn" || step.mode === "signUp" ? (
             <>
               <CardHeader className="text-center">
                 <div className="mb-2 flex justify-center">
                   <CawMark className="size-10 rounded-xl bg-foreground p-2 text-background" />
                 </div>
                 <CardTitle className="text-xl">
-                  {step.mode === "signIn" ? "Welcome back" : "Create your account"}
+                  {step.mode === "signIn" ? t("auth.welcomeBack") : t("auth.createAccount")}
                 </CardTitle>
                 <CardDescription>
-                  {step.mode === "signIn"
-                    ? "Sign in with your email and password."
-                    : "Sign up — you’ll verify your email to continue."}
+                  {step.mode === "signIn" ? t("auth.signInDesc") : t("auth.signUpDesc")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -352,40 +378,51 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   className="space-y-4"
                 >
                   {step.mode === "signUp" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="username">Username</Label>
-                        <div className="relative">
-                          <AtSign className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            id="username"
-                            name="username"
-                            className="pl-9"
-                            placeholder="creator"
-                            autoComplete="username"
-                            required
-                            disabled={isLoading}
-                          />
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setStep({ mode: "plans" })}
+                        className="flex w-full items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                      >
+                        <ArrowLeft className="size-3.5 shrink-0" />
+                        <span className="truncate">{t("auth.planNoteShort")}</span>
+                        <span className="ml-auto font-medium text-brand">Plans</span>
+                      </button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="username">{t("auth.username")}</Label>
+                          <div className="relative">
+                            <AtSign className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="username"
+                              name="username"
+                              className="pl-9"
+                              placeholder="creator"
+                              autoComplete="username"
+                              required
+                              disabled={isLoading}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="name">{t("auth.displayName")}</Label>
+                          <div className="relative">
+                            <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id="name"
+                              name="name"
+                              className="pl-9"
+                              placeholder="Your name"
+                              autoComplete="name"
+                              disabled={isLoading}
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Display name</Label>
-                        <div className="relative">
-                          <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            id="name"
-                            name="name"
-                            className="pl-9"
-                            placeholder="Your name"
-                            autoComplete="name"
-                            disabled={isLoading}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    </>
                   )}
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t("auth.email")}</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -402,7 +439,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="password">{t("auth.password")}</Label>
                       {step.mode === "signIn" && (
                         <button
                           type="button"
@@ -412,7 +449,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                           }}
                           className="text-xs text-muted-foreground transition-colors hover:text-foreground"
                         >
-                          Forgot password?
+                          {t("auth.forgot")}
                         </button>
                       )}
                     </div>
@@ -440,7 +477,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   </div>
                   {step.mode === "signUp" && (
                     <div className="space-y-2">
-                      <Label htmlFor="confirm">Confirm password</Label>
+                      <Label htmlFor="confirm">{t("auth.confirmPassword")}</Label>
                       <Input
                         id="confirm"
                         name="confirm"
@@ -460,11 +497,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     {isLoading ? (
                       <>
                         <Loader2 className="mr-2 size-4 animate-spin" />
-                        {step.mode === "signIn" ? "Signing in…" : "Creating account…"}
+                        {step.mode === "signIn" ? t("auth.signingIn") : t("auth.creating")}
                       </>
                     ) : (
                       <>
-                        {step.mode === "signIn" ? "Sign in" : "Create account"}
+                        {step.mode === "signIn" ? t("auth.signIn") : t("auth.create")}
                         <ArrowRight className="ml-2 size-4" />
                       </>
                     )}
@@ -473,16 +510,16 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
               </CardContent>
               <CardFooter className="justify-center border-t pt-4">
                 <p className="text-sm text-muted-foreground">
-                  {step.mode === "signIn" ? "New to CawStream?" : "Already have an account?"}{" "}
+                  {step.mode === "signIn" ? t("auth.newHere") : t("auth.haveAccount")}{" "}
                   <button
                     type="button"
                     onClick={() => {
-                      setStep(step.mode === "signIn" ? { mode: "signUp" } : { mode: "signIn" });
+                      setStep(step.mode === "signIn" ? { mode: "plans" } : { mode: "signIn" });
                       setError(null);
                     }}
                     className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-brand"
                   >
-                    {step.mode === "signIn" ? "Create one" : "Sign in"}
+                    {step.mode === "signIn" ? t("auth.createOne") : t("auth.signIn")}
                   </button>
                 </p>
               </CardFooter>
@@ -493,10 +530,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="mb-2 flex justify-center">
                   <Mail className="size-9 text-brand" />
                 </div>
-                <CardTitle className="text-xl">Check your email</CardTitle>
+                <CardTitle className="text-xl">{t("auth.checkEmail")}</CardTitle>
                 <CardDescription>
-                  We sent a 6-digit code to <span className="font-medium">{step.email}</span>.
-                  It expires in 10 minutes.
+                  {t("auth.checkEmailDesc", { email: step.email })}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleVerify}>
@@ -532,11 +568,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     className="w-full"
                     disabled={isLoading || otp.length !== 6}
                   >
-                    {isLoading ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      "Verify email"
-                    )}
+                    {isLoading ? <Loader2 className="size-4 animate-spin" /> : t("auth.verifyEmail")}
                   </Button>
                   <Button
                     type="button"
@@ -546,7 +578,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     disabled={isLoading}
                   >
                     <RefreshCw className="mr-2 size-4" />
-                    Resend code
+                    {t("auth.resendCode")}
                   </Button>
                   <Button
                     type="button"
@@ -558,7 +590,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     }}
                     disabled={isLoading}
                   >
-                    Use a different email
+                    {t("auth.differentEmail")}
                   </Button>
                 </CardFooter>
               </form>
@@ -569,15 +601,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="mb-2 flex justify-center">
                   <Lock className="size-9 text-brand" />
                 </div>
-                <CardTitle className="text-xl">Reset your password</CardTitle>
-                <CardDescription>
-                  Enter your email and we’ll send you a code to set a new password.
-                </CardDescription>
+                <CardTitle className="text-xl">{t("auth.resetPassword")}</CardTitle>
+                <CardDescription>{t("auth.resetDesc")}</CardDescription>
               </CardHeader>
               <form onSubmit={handleForgot}>
                 <CardContent className="space-y-4 pb-4">
                   <div className="space-y-2">
-                    <Label htmlFor="reset-email">Email</Label>
+                    <Label htmlFor="reset-email">{t("auth.email")}</Label>
                     <Input
                       id="reset-email"
                       name="email"
@@ -597,7 +627,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       <Loader2 className="mr-2 size-4 animate-spin" />
                     ) : (
                       <>
-                        Send reset code
+                        {t("auth.sendReset")}
                         <ArrowRight className="ml-2 size-4" />
                       </>
                     )}
@@ -613,7 +643,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       setError(null);
                     }}
                   >
-                    Back to sign in
+                    {t("auth.backToSignIn")}
                   </Button>
                 </CardFooter>
               </form>
@@ -624,11 +654,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                 <div className="mb-2 flex justify-center">
                   <Lock className="size-9 text-brand" />
                 </div>
-                <CardTitle className="text-xl">Set a new password</CardTitle>
-                <CardDescription>
-                  Enter the code from your email, then choose a new password
-                  (min. 8 characters).
-                </CardDescription>
+                <CardTitle className="text-xl">{t("auth.setNewPassword")}</CardTitle>
+                <CardDescription>{t("auth.setNewPasswordDesc")}</CardDescription>
               </CardHeader>
               <form onSubmit={handleReset}>
                 <CardContent className="space-y-4 pb-4">
@@ -652,7 +679,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </InputOTP>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="new-password">New password</Label>
+                    <Label htmlFor="new-password">{t("auth.newPasswordField")}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -675,7 +702,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirm-new">Confirm new password</Label>
+                    <Label htmlFor="confirm-new">{t("auth.confirmNewPassword")}</Label>
                     <Input
                       id="confirm-new"
                       name="confirm"
@@ -691,11 +718,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </p>
                   )}
                   <Button type="submit" className="w-full" disabled={isLoading || otp.length !== 6}>
-                    {isLoading ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      "Update password"
-                    )}
+                    {isLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : t("auth.updatePassword")}
                   </Button>
                 </CardContent>
                 <CardFooter className="justify-center border-t pt-4">
@@ -707,18 +730,20 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     disabled={isLoading}
                   >
                     <RefreshCw className="mr-2 size-4" />
-                    Resend code
+                    {t("auth.resendCode")}
                   </Button>
                 </CardFooter>
               </form>
             </>
           )}
 
-          <div className="border-t bg-muted/40 px-6 py-3 text-center text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 border-t bg-muted/40 px-6 py-3 text-center text-xs text-muted-foreground">
             <span className={cn("inline-flex items-center gap-1.5")}>
               <ShieldCheck className="size-3.5" />
-              Secured by Freebuff
+              {t("auth.secBy")}
             </span>
+            <span aria-hidden>·</span>
+            <LanguageSwitcher className="h-6 border-transparent bg-transparent px-1.5" />
           </div>
         </Card>
       </div>

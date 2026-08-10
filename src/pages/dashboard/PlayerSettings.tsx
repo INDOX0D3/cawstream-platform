@@ -11,6 +11,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
+import { useI18n } from "@/lib/i18n";
 import { useMutation, useQuery } from "convex/react";
 import { Gauge, Loader2, MonitorPlay, Stamp, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ interface PrefsForm {
 }
 
 export default function PlayerSettings() {
+  const { t } = useI18n();
   const existing = useQuery(api.playerPrefs.getMyPlayerSettings);
   const update = useMutation(api.playerPrefs.updatePlayerSettings);
   const [form, setForm] = useState<PrefsForm | null>(null);
@@ -57,7 +59,7 @@ export default function PlayerSettings() {
         defaultSpeed: form.defaultSpeed,
         showWatermark: form.showWatermark,
       });
-      toast.success("Player preferences saved");
+      toast.success(t("playerPrefs.saved"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save preferences");
     } finally {
@@ -69,11 +71,8 @@ export default function PlayerSettings() {
     <div className="mx-auto max-w-xl space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Player preferences</CardTitle>
-          <CardDescription>
-            These apply when you watch any video on CawStream — they never
-            affect what your own viewers see.
-          </CardDescription>
+          <CardTitle>{t("playerPrefs.title")}</CardTitle>
+          <CardDescription>{t("playerPrefs.desc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between gap-4">
@@ -82,10 +81,8 @@ export default function PlayerSettings() {
                 <MonitorPlay className="size-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Autoplay</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Start playback automatically when you open a video.
-                </p>
+                <p className="text-sm font-semibold">{t("playerPrefs.autoplay")}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("playerPrefs.autoplayDesc")}</p>
               </div>
             </div>
             <Switch
@@ -100,7 +97,7 @@ export default function PlayerSettings() {
                 <Volume2 className="size-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Default volume</p>
+                <p className="text-sm font-semibold">{t("playerPrefs.volume")}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {Math.round(form.defaultVolume * 100)}%
                 </p>
@@ -124,10 +121,8 @@ export default function PlayerSettings() {
                 <Gauge className="size-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Default playback speed</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  The speed new videos start at.
-                </p>
+                <p className="text-sm font-semibold">{t("playerPrefs.speed")}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("playerPrefs.speedDesc")}</p>
               </div>
             </div>
             <Select
@@ -155,10 +150,8 @@ export default function PlayerSettings() {
                 <Stamp className="size-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Show watermarks</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Display the platform watermark on videos you watch.
-                </p>
+                <p className="text-sm font-semibold">{t("playerPrefs.watermark")}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("playerPrefs.watermarkDesc")}</p>
               </div>
             </div>
             <Switch
@@ -170,7 +163,7 @@ export default function PlayerSettings() {
           <div className="flex justify-end pt-1">
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Save preferences
+              {t("playerPrefs.save")}
             </Button>
           </div>
         </CardContent>

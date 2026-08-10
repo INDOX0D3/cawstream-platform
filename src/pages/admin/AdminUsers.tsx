@@ -3,6 +3,13 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,6 +32,7 @@ import { api } from "@/convex/_generated/api";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useMutation, useQuery } from "convex/react";
 import { Ban, CheckCircle2, Loader2, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import type { Plan } from "@/convex/schema";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -44,10 +52,12 @@ export default function AdminUsers() {
   const users = useQuery(api.admin.listUsers);
   const setUserStatus = useMutation(api.admin.setUserStatus);
   const setUserRole = useMutation(api.admin.setUserRole);
+  const setUserPlan = useMutation(api.admin.setUserPlan);
   const deleteUser = useMutation(api.admin.deleteUser);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
+  const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
 
   const toggleStatus = async (user: UserRow) => {
     setBusyId(user._id);
@@ -74,6 +84,19 @@ export default function AdminUsers() {
       toast.error(error instanceof Error ? error.message : "Could not update role");
     } finally {
       setBusyRoleId(null);
+    }
+  };
+
+  const changePlan = async (user: UserRow, plan: Plan) => {
+    if (plan === (user.plan ?? "free")) return;
+    setBusyPlanId(user._id);
+    try {
+      await setUserPlan({ userId: user._id, plan });
+      toast.success(`Plan for ${user.name} set to ${plan}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update plan");
+    } finally {
+      setBusyPlanId(null);
     }
   };
 
@@ -112,6 +135,7 @@ export default function AdminUsers() {
             <TableRow>
               <TableHead>User</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Videos</TableHead>
               <TableHead className="text-right">Views</TableHead>
@@ -123,7 +147,7 @@ export default function AdminUsers() {
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   No users yet.
                 </TableCell>
               </TableRow>
@@ -152,6 +176,26 @@ export default function AdminUsers() {
                     <Badge variant={user.role === "admin" ? "default" : "secondary"}>
                       {user.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={user.plan ?? "free"}
+                      onValueChange={(v) => void changePlan(user, v as Plan)}
+                      disabled={busyPlanId === user._id}
+                    >
+                      <SelectTrigger className="h-7 w-28 text-xs">
+                        {busyPlanId === user._id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <SelectValue />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="premium">Premium</SelectItem>
+                        <SelectItem value="platinum">Platinum</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={user.status} kind="account" />

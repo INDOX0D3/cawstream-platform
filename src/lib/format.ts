@@ -45,15 +45,21 @@ export function formatDateTime(ts: number): string {
   });
 }
 
-export function formatRelative(ts: number): string {
+const RELATIVE_STRINGS = {
+  en: { now: "just now", m: "m ago", h: "h ago", d: "d ago" },
+  id: { now: "baru saja", m: "m lalu", h: "j lalu", d: "h lalu" },
+} as const;
+
+export function formatRelative(ts: number, lang: "en" | "id" = "en"): string {
+  const dict = RELATIVE_STRINGS[lang] ?? RELATIVE_STRINGS.en;
   const diff = Date.now() - ts;
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return dict.now;
+  if (minutes < 60) return `${minutes}${dict.m}`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}${dict.h}`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return `${days}${dict.d}`;
   return formatDate(ts);
 }
 

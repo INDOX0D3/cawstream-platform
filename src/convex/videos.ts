@@ -28,6 +28,9 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PROCESSING_STATUSES = ["uploading", "queued", "processing"];
 
+/** Free-plan storage cap: 500 MB of stored uploads (no backup). */
+export const FREE_STORAGE_LIMIT_BYTES = 500 * 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // Upload lifecycle (mutations — database + storage + external APIs)
 // ---------------------------------------------------------------------------
@@ -66,6 +69,23 @@ export const prepareUpload = mutation({
       throw new Error(
         `File exceeds the ${Math.round(limits.maxUploadBytes / 1024 / 1024)} MB upload limit.`,
       );
+    }
+
+    // Free-plan storage cap: 500 MB of uploads. Paid plans are unlimited.
+    const plan = user.plan ?? "free";
+    if (plan === "free") {
+      const owned = await ctx.db
+        .query("videos")
+        .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+        .collect();
+      const used = owned
+        .filter((v) => !v.archivedAt && v.status !== "failed")
+        .reduce((sum, v) => sum + v.sizeBytes, 0);
+      if (used + sizeBytes > FREE_STORAGE_LIMIT_BYTES) {
+        throw new Error(
+          "Free plan storage limit reached (500 MB). Upgrade to Premium or Platinum for unlimited uploads.",
+        );
+      }
     }
 
     // Allocate a unique random public ID (never the db id).
@@ -393,6 +413,29 @@ export const getMine = query({
           .map(([date, count]) => ({ date, count }))
           .sort((a, b) => a.date.localeCompare(b.date)),
       },
+    };
+  },
+});
+
+/** Current account plan + storage usage. Powers the upload limit UI and the
+ *  dashboard usage banner. Free accounts get a 500 MB cap; paid plans are
+ *  unlimited (limitBytes = null). Failed uploads never count against the cap. */
+export const getUsage = query({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+    const videos = await ctx.db
+      .query("videos")
+      .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+      .collect();
+    const usedBytes = videos
+      .filter((v) => !v.archivedAt && v.status !== "failed")
+      .reduce((sum, v) => sum + v.sizeBytes, 0);
+    const plan = user.plan ?? "free";
+    return {
+      plan,
+      usedBytes,
+      limitBytes: plan === "free" ? FREE_STORAGE_LIMIT_BYTES : null,
     };
   },
 });

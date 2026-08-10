@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/lib/i18n";
 import { useMutation, useQuery } from "convex/react";
 import { AtSign, CheckCircle2, Loader2, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +24,7 @@ function initials(name: string): string {
 
 export default function Profile() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const updateProfile = useMutation(api.users.updateProfile);
 
   const [name, setName] = useState(user?.name ?? "");
@@ -56,7 +58,7 @@ export default function Profile() {
     setSaving(true);
     try {
       await updateProfile({ name, username });
-      toast.success("Profile updated");
+      toast.success(t("profile.updated"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update profile");
     } finally {
@@ -77,14 +79,14 @@ export default function Profile() {
                 {user?.name ?? "Account"}
                 <StatusBadge status={user?.status ?? "active"} kind="account" />
               </CardTitle>
-              <CardDescription>{user?.email ?? "No email on this account"}</CardDescription>
+              <CardDescription>{user?.email ?? t("profile.noEmail")}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="name">Display name</Label>
+              <Label htmlFor="name">{t("profile.displayName")}</Label>
               <div className="relative">
                 <UserRound className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -96,7 +98,7 @@ export default function Profile() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">{t("profile.username")}</Label>
               <div className="relative">
                 <AtSign className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -107,7 +109,7 @@ export default function Profile() {
                 />
               </div>
               {usernameTaken && (
-                <p className="text-xs text-destructive">That username is already taken.</p>
+                <p className="text-xs text-destructive">{t("profile.taken")}</p>
               )}
             </div>
           </div>
@@ -115,7 +117,7 @@ export default function Profile() {
           <div className="flex justify-end">
             <Button onClick={save} disabled={saving || usernameTaken}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-              Save profile
+              {t("profile.save")}
             </Button>
           </div>
         </CardContent>
@@ -123,35 +125,35 @@ export default function Profile() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Account details</CardTitle>
+          <CardTitle className="text-base">{t("profile.accountDetails")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
             <span className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="size-4" /> Email
+              <Mail className="size-4" /> {t("profile.email")}
             </span>
             <span className="flex items-center gap-2">
               {user?.email ?? "—"}
               {user?.emailVerified ? (
                 <Badge variant="outline" className="gap-1 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="size-3" /> Verified
+                  <CheckCircle2 className="size-3" /> {t("profile.verified")}
                 </Badge>
               ) : (
-                <Badge variant="outline">Unverified</Badge>
+                <Badge variant="outline">{t("profile.unverified")}</Badge>
               )}
             </span>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
             <span className="flex items-center gap-2 text-muted-foreground">
-              <ShieldCheck className="size-4" /> Role
+              <ShieldCheck className="size-4" /> {t("profile.role")}
             </span>
             <Badge variant="secondary" className="capitalize">
-              {user?.role === "admin" ? "Administrator" : "Member"}
+              {user?.role === "admin" ? t("profile.administrator") : t("profile.member")}
             </Badge>
           </div>
           <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
             <span className="flex items-center gap-2 text-muted-foreground">
-              <UserRound className="size-4" /> Member since
+              <UserRound className="size-4" /> {t("profile.memberSince")}
             </span>
             <span>
               {user?._creationTime

@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
 import { embedCode, socialPreviewUrl, videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -58,6 +59,7 @@ type VideoRow = NonNullable<ReturnType<typeof useQuery<typeof api.videos.listMin
 const FILTERS = ["all", "ready", "processing", "failed"] as const;
 
 export default function Videos() {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [selected, setSelected] = useState<VideoRow | null>(null);
   const videos = useQuery(api.videos.listMine, { status: filter === "all" ? undefined : filter });
@@ -78,10 +80,10 @@ export default function Videos() {
         className="w-full"
       >
         <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="ready">Ready</TabsTrigger>
-          <TabsTrigger value="processing">Processing</TabsTrigger>
-          <TabsTrigger value="failed">Failed</TabsTrigger>
+          <TabsTrigger value="all">{t("videos.all")}</TabsTrigger>
+          <TabsTrigger value="ready">{t("videos.ready")}</TabsTrigger>
+          <TabsTrigger value="processing">{t("videos.processing")}</TabsTrigger>
+          <TabsTrigger value="failed">{t("videos.failed")}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -106,19 +108,19 @@ export default function Videos() {
           icon={filter === "failed" ? RefreshCw : Clapperboard}
           title={
             filter === "failed"
-              ? "No failed videos"
+              ? t("videos.failed")
               : filter === "processing"
-                ? "Nothing processing right now"
-                : "No videos here yet"
+                ? t("videos.processing")
+                : t("videos.emptyAll")
           }
           description={
             filter === "all"
-              ? "Upload a video and it will show up here as it moves through processing."
-              : "Try a different filter or upload a new video."
+              ? t("videos.emptyAllDesc")
+              : t("videos.emptyFilter")
           }
           action={
             <Link to="/dashboard/upload">
-              <Button variant="outline">Upload a video</Button>
+              <Button variant="outline">{t("videos.uploadVideo")}</Button>
             </Link>
           }
         />
@@ -138,6 +140,7 @@ function VideoDetailDialog({
   video: VideoRow;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const detail = useQuery(api.videos.getMine, { videoId: video._id });
   const updateVideo = useMutation(api.videos.updateVideo);
@@ -164,7 +167,7 @@ function VideoDetailDialog({
     setSaving(true);
     try {
       await updateVideo({ videoId: video._id, title, description });
-      toast.success("Video details updated");
+      toast.success(t("videos.updated"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save changes");
     } finally {
@@ -175,7 +178,7 @@ function VideoDetailDialog({
   const handleDelete = async () => {
     try {
       await deleteVideo({ videoId: video._id });
-      toast.success("Video deleted");
+      toast.success(t("videos.deleted"));
       onClose();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not delete video");
@@ -218,7 +221,7 @@ function VideoDetailDialog({
         codec: meta.codec,
         bitrate: meta.bitrate,
       });
-      toast.success("Video reprocessed and ready again");
+      toast.success(t("videos.reprocessed"));
       onClose();
     } catch (error) {
       await markFailed({
@@ -252,15 +255,20 @@ function VideoDetailDialog({
           <DialogHeader>
             <DialogTitle className="pr-10">{video.title}</DialogTitle>
             <DialogDescription>
-              {video.publicId} · uploaded {formatDateTime(video._creationTime)}
+              {t("videos.dialogDesc", {
+                id: video.publicId,
+                date: formatDateTime(video._creationTime),
+              })}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Eye className="size-4" />
-              {video.views.toLocaleString()} views ·{" "}
-              {formatCompact(detail?.stats.uniqueViewers ?? 0)} unique
+              {t("videos.viewsStats", {
+                views: video.views.toLocaleString(),
+                n: formatCompact(detail?.stats.uniqueViewers ?? 0),
+              })}
             </div>
             <div className="flex items-center justify-end gap-2">
               <StatusBadge status={video.status} />
@@ -271,23 +279,23 @@ function VideoDetailDialog({
           <Tabs defaultValue="details">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details">
-                <Pencil className="mr-1.5 size-3.5" /> Details
+                <Pencil className="mr-1.5 size-3.5" /> {t("videos.tabDetails")}
               </TabsTrigger>
               <TabsTrigger value="stats">
-                <BarChart3 className="mr-1.5 size-3.5" /> Stats
+                <BarChart3 className="mr-1.5 size-3.5" /> {t("videos.tabStats")}
               </TabsTrigger>
               <TabsTrigger value="embed">
-                <Code2 className="mr-1.5 size-3.5" /> Embed
+                <Code2 className="mr-1.5 size-3.5" /> {t("videos.tabEmbed")}
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="details" className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Title</label>
+                <label className="text-sm font-medium">{t("videos.title")}</label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Description</label>
+                <label className="text-sm font-medium">{t("videos.description")}</label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -296,21 +304,21 @@ function VideoDetailDialog({
               </div>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg border p-3">
-                  <dt className="text-xs text-muted-foreground">File</dt>
+                  <dt className="text-xs text-muted-foreground">{t("videos.file")}</dt>
                   <dd className="mt-1 truncate font-medium">{video.fileName}</dd>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <dt className="text-xs text-muted-foreground">Size</dt>
+                  <dt className="text-xs text-muted-foreground">{t("videos.size")}</dt>
                   <dd className="mt-1 font-medium">{formatBytes(video.sizeBytes)}</dd>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <dt className="text-xs text-muted-foreground">Resolution</dt>
+                  <dt className="text-xs text-muted-foreground">{t("videos.resolution")}</dt>
                   <dd className="mt-1 font-medium">
                     {video.width && video.height ? `${video.width}×${video.height}` : "—"}
                   </dd>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <dt className="text-xs text-muted-foreground">Codec</dt>
+                  <dt className="text-xs text-muted-foreground">{t("videos.codec")}</dt>
                   <dd className="mt-1 font-medium">{video.codec ?? "—"}</dd>
                 </div>
               </dl>
@@ -322,16 +330,16 @@ function VideoDetailDialog({
                     ) : (
                       <RefreshCw className="mr-2 size-4" />
                     )}
-                    Retry processing
+                    {t("videos.retry")}
                   </Button>
                 )}
                 <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
                   <Trash2 className="mr-2 size-4" />
-                  Delete
+                  {t("videos.delete")}
                 </Button>
                 <Button onClick={save} disabled={saving}>
                   {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-                  Save changes
+                  {t("videos.save")}
                 </Button>
               </div>
             </TabsContent>
@@ -340,7 +348,7 @@ function VideoDetailDialog({
               {daily.length === 0 ? (
                 <div className="flex h-52 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
                   <FileVideo className="size-8 opacity-50" />
-                  No views in the last 13 days yet.
+                  {t("videos.noViews")}
                 </div>
               ) : (
                 <div className="h-56">
@@ -391,41 +399,41 @@ function VideoDetailDialog({
             <TabsContent value="embed" className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <label className="text-sm font-medium">Embed code</label>
+                  <label className="text-sm font-medium">{t("videos.embedCode")}</label>
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    Start in fullscreen
+                    {t("videos.startFullscreen")}
                     <Switch checked={autoFullEmbed} onCheckedChange={setAutoFullEmbed} />
                   </label>
                 </div>
                 <pre className="max-h-40 overflow-auto rounded-lg border bg-muted/40 p-3 text-xs leading-5">
                   {embed}
                 </pre>
-                <CopyButton value={embed} label="Copy embed code" />
+                <CopyButton value={embed} label={t("videos.copyEmbed")} />
               </div>
               <div className="grid gap-2 text-sm">
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="truncate text-muted-foreground">Watch page</span>
+                  <span className="truncate text-muted-foreground">{t("videos.watchPage")}</span>
                   <span className="flex items-center gap-2">
                     <code className="max-w-[220px] truncate text-xs">{urls.watch}</code>
-                    <CopyButton value={urls.watch} size="icon" label="Copy watch URL" />
+                    <CopyButton value={urls.watch} size="icon" label={t("videos.copyWatchUrl")} />
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="truncate text-muted-foreground">Direct MP4</span>
+                  <span className="truncate text-muted-foreground">{t("videos.directMp4")}</span>
                   <span className="flex items-center gap-2">
                     <code className="max-w-[220px] truncate text-xs">{urls.mp4}</code>
-                    <CopyButton value={urls.mp4} size="icon" label="Copy MP4 URL" />
+                    <CopyButton value={urls.mp4} size="icon" label={t("videos.copyMp4Url")} />
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="truncate text-muted-foreground">Thumbnail</span>
+                  <span className="truncate text-muted-foreground">{t("videos.thumbnail")}</span>
                   <span className="flex items-center gap-2">
                     <code className="max-w-[220px] truncate text-xs">{urls.thumb}</code>
-                    <CopyButton value={urls.thumb} size="icon" label="Copy thumbnail URL" />
+                    <CopyButton value={urls.thumb} size="icon" label={t("videos.copyThumbUrl")} />
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="truncate text-muted-foreground">Social preview</span>
+                  <span className="truncate text-muted-foreground">{t("videos.socialPreview")}</span>
                   <span className="flex items-center gap-2">
                     <code className="max-w-[220px] truncate text-xs">
                       {socialPreviewUrl(video.publicId)}
@@ -433,15 +441,12 @@ function VideoDetailDialog({
                     <CopyButton
                       value={socialPreviewUrl(video.publicId)}
                       size="icon"
-                      label="Copy social preview link"
+                      label={t("videos.copySocialUrl")}
                     />
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Paste the social preview link in WhatsApp, X or Facebook to show a
-                video card with a play-button thumbnail — no JavaScript needed.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("videos.socialHint")}</p>
             </TabsContent>
           </Tabs>
         </DialogContent>
@@ -450,19 +455,16 @@ function VideoDetailDialog({
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this video?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The file, thumbnail, views and embed links will be permanently
-              removed. This cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t("videos.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("videos.deleteDesc")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("upload.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={handleDelete}
             >
-              Delete video
+              {t("videos.deleteConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -3,7 +3,7 @@ import { Scrypt } from "lucia";
 import { v } from "convex/values";
 import type { GenericId } from "convex/values";
 import { MutationCtx, QueryCtx, mutation, query } from "./_generated/server";
-import { ROLES, type Role } from "./schema";
+import { ROLES, type Plan, type Role } from "./schema";
 
 // Password hashing uses the same Scrypt primitive as Convex Auth's Password
 // provider (`lucia`), so change-password can verify and re-hash the stored
@@ -34,6 +34,7 @@ export function normalizeUser(user: UserDoc) {
     username: user.username ?? user.email?.split("@")[0] ?? "user",
     role: (user.role ?? ROLES.USER) as Role,
     status: (user.status ?? "active") as "active" | "suspended",
+    plan: (user.plan ?? "free") as Plan,
     isAnonymous: user.isAnonymous ?? false,
   };
 }

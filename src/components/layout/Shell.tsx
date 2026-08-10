@@ -10,10 +10,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { useAuth } from "@/hooks/use-auth";
+import { LanguageSwitcher, useI18n, type DictKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import {
   Clapperboard,
+  Crown,
   Film,
   HardDrive,
   LayoutDashboard,
@@ -33,36 +36,36 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 interface NavItem {
   to: string;
-  label: string;
+  label: DictKey;
   icon: LucideIcon;
   end?: boolean;
 }
 
 const USER_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/dashboard/videos", label: "My Videos", icon: Clapperboard },
-  { to: "/dashboard/upload", label: "Upload Video", icon: Upload },
-  { to: "/dashboard/advertisements", label: "Advertisements", icon: Megaphone },
-  { to: "/dashboard/player", label: "Player Settings", icon: Settings2 },
-  { to: "/dashboard/profile", label: "Profile", icon: UserIcon },
-  { to: "/dashboard/security", label: "Security", icon: ShieldCheck },
+  { to: "/dashboard", label: "nav.overview", icon: LayoutDashboard, end: true },
+  { to: "/dashboard/videos", label: "nav.videos", icon: Clapperboard },
+  { to: "/dashboard/upload", label: "nav.upload", icon: Upload },
+  { to: "/dashboard/advertisements", label: "nav.ads", icon: Megaphone },
+  { to: "/dashboard/player", label: "nav.player", icon: Settings2 },
+  { to: "/dashboard/profile", label: "nav.profile", icon: UserIcon },
+  { to: "/dashboard/security", label: "nav.security", icon: ShieldCheck },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/videos", label: "Videos", icon: Film },
-  { to: "/admin/storage", label: "Storage", icon: HardDrive },
-  { to: "/admin/player", label: "Player", icon: MonitorPlay },
-  { to: "/admin/branding", label: "Branding", icon: Stamp },
-  { to: "/admin/smtp", label: "SMTP", icon: Mail },
-  { to: "/admin/system", label: "System", icon: Server },
-  { to: "/admin/logs", label: "Logs", icon: ScrollText },
+  { to: "/admin", label: "nav.overview", icon: LayoutDashboard, end: true },
+  { to: "/admin/users", label: "nav.users", icon: Users },
+  { to: "/admin/videos", label: "nav.videos", icon: Film },
+  { to: "/admin/storage", label: "nav.storage", icon: HardDrive },
+  { to: "/admin/player", label: "nav.player", icon: MonitorPlay },
+  { to: "/admin/branding", label: "nav.branding", icon: Stamp },
+  { to: "/admin/smtp", label: "nav.smtp", icon: Mail },
+  { to: "/admin/system", label: "nav.system", icon: Server },
+  { to: "/admin/logs", label: "nav.logs", icon: ScrollText },
 ];
 
 function initials(name: string): string {
@@ -74,10 +77,18 @@ function initials(name: string): string {
     .join("");
 }
 
-function UserMenu({ onSignOut }: { onSignOut: () => void }) {
+const PLAN_NAME: Record<string, string> = {
+  free: "Free",
+  premium: "Premium",
+  platinum: "Platinum",
+};
+
+function UserMenu({ onSignOut, onUpgrade }: { onSignOut: () => void; onUpgrade: () => void }) {
   const { user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
+  const plan = user?.plan ?? "free";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -93,33 +104,49 @@ function UserMenu({ onSignOut }: { onSignOut: () => void }) {
           </span>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="font-normal">
           <p className="truncate text-sm font-medium">{user?.name ?? "Account"}</p>
           <p className="truncate text-xs text-muted-foreground">{user?.email ?? "—"}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem disabled className="justify-between">
+          <span className="flex items-center gap-2">
+            <Crown className="size-4 text-amber-500" />
+            {plan === "free" ? t("menu.planFree") : PLAN_NAME[plan]}
+          </span>
+          {plan === "free" && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="text-xs font-medium text-brand hover:underline"
+            >
+              {t("menu.upgrade")}
+            </button>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {isAdmin && (
           <>
             <DropdownMenuItem onClick={() => navigate("/admin")}>
               <Server className="mr-2 size-4" />
-              Admin panel
+              {t("nav.admin")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         <DropdownMenuItem onClick={() => navigate("/dashboard/profile")}>
           <UserIcon className="mr-2 size-4" />
-          Profile
+          {t("menu.profile")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/dashboard/security")}>
           <ShieldCheck className="mr-2 size-4" />
-          Security
+          {t("menu.security")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive">
           <LogOut className="mr-2 size-4" />
-          Sign out
+          {t("nav.signout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -127,6 +154,7 @@ function UserMenu({ onSignOut }: { onSignOut: () => void }) {
 }
 
 function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
+  const { t } = useI18n();
   return (
     <nav className="flex flex-col gap-0.5 px-3">
       {items.map((item) => (
@@ -145,7 +173,7 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
           }
         >
           <item.icon className="size-4" />
-          {item.label}
+          {t(item.label)}
         </NavLink>
       ))}
     </nav>
@@ -162,8 +190,10 @@ function ShellFrame({
   extra?: ReactNode;
 }) {
   const { user, signOut, isLoading } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -198,17 +228,17 @@ function ShellFrame({
           {admin ? (
             <div className="space-y-3">
               <Badge variant="outline" className="w-full justify-center gap-1.5">
-                <Server className="size-3" /> Administrator
+                <Server className="size-3" /> {t("nav.administrator")}
               </Badge>
               <Link to="/dashboard" className="block">
                 <Button variant="ghost" size="sm" className="w-full justify-center text-muted-foreground">
-                  Back to dashboard
+                  {t("nav.backDashboard")}
                 </Button>
               </Link>
             </div>
           ) : (
             <p className="text-center text-[11px] leading-4 text-muted-foreground">
-              Video hosting for creators
+              {t("nav.shellFooter")}
               <br />
               CawStream
             </p>
@@ -243,7 +273,7 @@ function ShellFrame({
                   <div className="px-6 pb-4">
                     <Link to="/dashboard">
                       <Button variant="ghost" size="sm" className="w-full text-muted-foreground">
-                        Back to dashboard
+                        {t("nav.backDashboard")}
                       </Button>
                     </Link>
                   </div>
@@ -252,7 +282,7 @@ function ShellFrame({
             </Sheet>
             <div className="flex items-center gap-2">
               <h1 className="text-[15px] font-semibold tracking-tight">
-                {current?.label ?? "Dashboard"}
+                {current ? t(current.label) : t("nav.overview")}
               </h1>
               {admin && (
                 <Badge variant="secondary" className="hidden sm:inline-flex">
@@ -261,23 +291,23 @@ function ShellFrame({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {!admin && (
               <Link to="/dashboard/upload">
                 <Button size="sm" className="hidden sm:inline-flex">
                   <Upload className="mr-1.5 size-3.5" />
-                  Upload
+                  {t("nav.uploadShort")}
                 </Button>
               </Link>
             )}
-            <UserMenu onSignOut={handleSignOut} />
+            <LanguageSwitcher className="hidden sm:inline-flex" />
+            <UserMenu onSignOut={handleSignOut} onUpgrade={() => setUpgradeOpen(true)} />
           </div>
         </header>
 
         {suspended && (
           <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-2 text-center text-sm text-destructive sm:px-6">
-            Your account is suspended. Uploading, editing and player access are
-            disabled. Contact support if you believe this is a mistake.
+            {t("shell.suspended")}
           </div>
         )}
 
@@ -286,6 +316,8 @@ function ShellFrame({
           {extra}
         </main>
       </div>
+
+      <UpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
     </div>
   );
 }

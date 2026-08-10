@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { videoUrls } from "@/lib/embed";
 import { formatCompact, formatDuration, formatRelative } from "@/lib/format";
+import { useI18n, type DictKey } from "@/lib/i18n";
 import { Eye, ImageIcon, Link2, Pencil, Play, Share2 } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
@@ -27,24 +28,25 @@ export interface VideoCardVideo {
  *  preview link and thumbnail link). Rendered inside the card when `showLinks`
  *  is set — used on the My Videos grid. */
 function CopyLinksPopover({ publicId }: { publicId: string }) {
+  const { t } = useI18n();
   const urls = videoUrls(publicId);
   const rows = [
     {
       icon: <Play className="size-3.5" />,
-      label: "Embed link",
-      hint: "Opens the fullscreen player",
+      labelKey: "card.embedLink" as DictKey,
+      hintKey: "card.embedHint" as DictKey,
       value: urls.embed,
     },
     {
       icon: <Share2 className="size-3.5" />,
-      label: "Social preview",
-      hint: "Rich video card on WhatsApp / X / FB",
+      labelKey: "card.socialLink" as DictKey,
+      hintKey: "card.socialHint" as DictKey,
       value: urls.social,
     },
     {
       icon: <ImageIcon className="size-3.5" />,
-      label: "Thumbnail",
-      hint: "Direct thumbnail image URL",
+      labelKey: "card.thumbLink" as DictKey,
+      hintKey: "card.thumbHint" as DictKey,
       value: urls.thumb,
     },
   ];
@@ -54,8 +56,8 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label="Copy share links"
-          title="Copy links"
+          aria-label={t("card.links")}
+          title={t("card.links")}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -67,31 +69,28 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 p-3">
         <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Copy links
+          {t("card.links")}
         </p>
         <div className="space-y-1.5">
           {rows.map((row) => (
             <div
-              key={row.label}
+              key={row.labelKey}
               className="flex items-center gap-2 rounded-lg border px-2 py-1.5"
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                 {row.icon}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">{row.label}</span>
+                <span className="block truncate text-xs font-medium">{t(row.labelKey)}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
                   {row.value}
                 </span>
               </span>
-              <CopyButton value={row.value} size="icon" label={`Copy ${row.label}`} />
+              <CopyButton value={row.value} size="icon" label={t(row.labelKey)} />
             </div>
           ))}
         </div>
-        <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-          Tip: paste the social preview link in WhatsApp, X or Facebook to show a
-          video card with a play-button thumbnail — no JavaScript needed.
-        </p>
+        <p className="mt-2 px-1 text-[11px] text-muted-foreground">{t("card.linksTip")}</p>
       </PopoverContent>
     </Popover>
   );
@@ -116,6 +115,7 @@ export function VideoCard({
   showLinks?: boolean;
 }) {
   const isReady = video.status === "ready";
+  const { lang } = useI18n();
 
   return (
     <Link
@@ -180,7 +180,7 @@ export function VideoCard({
               <span aria-hidden>·</span>
             </>
           ) : null}
-          <span>{formatRelative(video._creationTime)}</span>
+          <span>{formatRelative(video._creationTime, lang)}</span>
         </p>
         {video.error && (
           <p className={cn("mt-1 line-clamp-1 text-xs text-destructive")}>{video.error}</p>

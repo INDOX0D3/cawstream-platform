@@ -5,7 +5,7 @@ import { normalizeUser, requireAdmin } from "./users";
 import { getProcessingBackend } from "./processor";
 import { getJobForVideo } from "./jobs";
 import { storageService } from "./lib/storage";
-import { accountStatusValidator, roleValidator } from "./schema";
+import { accountStatusValidator, planValidator, roleValidator } from "./schema";
 
 type WriteCtx = { db: MutationCtx["db"] };
 
@@ -109,6 +109,28 @@ export const setUserStatus = mutation({
     }
     await ctx.db.patch(userId, { status });
     await logEvent(ctx, "warning", "admin", `User ${user.email ?? userId} was ${status}.`);
+  },
+});
+
+/** Set a user's billing plan (Free / Premium / Platinum). Used after a
+ *  WhatsApp checkout is confirmed by the operator. Premium/Platinum unlock
+ *  unlimited uploads; Platinum additionally enables anti-bot view filtering. */
+export const setUserPlan = mutation({
+  args: {
+    userId: v.id("users"),
+    plan: planValidator,
+  },
+  handler: async (ctx, { userId, plan }) => {
+    await requireAdmin(ctx);
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found.");
+    await ctx.db.patch(userId, { plan });
+    await logEvent(
+      ctx,
+      "info",
+      "admin",
+      `Plan for ${user.email ?? userId} set to ${plan}.`,
+    );
   },
 });
 

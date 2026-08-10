@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export async function copyText(value: string): Promise<boolean> {
@@ -40,15 +41,16 @@ export function CopyButton({
   size?: "sm" | "icon";
 }) {
   const [copied, setCopied] = useState(false);
+  const { t } = useI18n();
 
   const onCopy = async () => {
     const ok = await copyText(value);
     if (ok) {
       setCopied(true);
-      toast.success("Copied to clipboard");
+      toast.success(t("copy.copied"));
       window.setTimeout(() => setCopied(false), 1600);
     } else {
-      toast.error("Could not copy — select and copy manually.");
+      toast.error(t("copy.failed"));
     }
   };
 
@@ -80,7 +82,7 @@ export function CopyButton({
       ) : (
         <Copy className="size-3.5" />
       )}
-      {copied ? "Copied" : label}
+      {copied ? t("copy.copiedShort") : label}
     </Button>
   );
 }

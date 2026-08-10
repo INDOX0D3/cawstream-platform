@@ -27,6 +27,23 @@ export const accountStatusValidator = v.union(
 );
 export type AccountStatus = Infer<typeof accountStatusValidator>;
 
+// ---------------------------------------------------------------------------
+// Plans (Free / Premium / Platinum)
+// ---------------------------------------------------------------------------
+
+export const PLANS = {
+  FREE: "free",
+  PREMIUM: "premium",
+  PLATINUM: "platinum",
+} as const;
+
+export const planValidator = v.union(
+  v.literal(PLANS.FREE),
+  v.literal(PLANS.PREMIUM),
+  v.literal(PLANS.PLATINUM),
+);
+export type Plan = Infer<typeof planValidator>;
+
 export const videoStatusValidator = v.union(
   v.literal("uploading"),
   v.literal("queued"),
@@ -59,6 +76,9 @@ const schema = defineSchema(
       role: v.optional(roleValidator),
       username: v.optional(v.string()),
       status: v.optional(accountStatusValidator),
+      // Paid plans are activated by an administrator after the WhatsApp
+      // checkout (setUserPlan in admin.ts). Free = 500 MB storage cap.
+      plan: v.optional(planValidator),
     })
       .index("email", ["email"])
       .index("username", ["username"]),

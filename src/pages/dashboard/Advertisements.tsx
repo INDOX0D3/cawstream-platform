@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
+import { useI18n } from "@/lib/i18n";
 import { useMutation, useQuery } from "convex/react";
 import { ExternalLink, Loader2, Megaphone, MousePointerClick, Popcorn, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -30,6 +31,7 @@ const EMPTY: AdsForm = {
 };
 
 export default function Advertisements() {
+  const { t } = useI18n();
   const existing = useQuery(api.ads.getMyAdSettings);
   const updateAdSettings = useMutation(api.ads.updateAdSettings);
   const [form, setForm] = useState<AdsForm | null>(null);
@@ -70,7 +72,7 @@ export default function Advertisements() {
         popunderEnabled: form.popunderEnabled,
         popunderCode: form.popunderCode,
       });
-      toast.success("Ad settings saved — active on all your embeds");
+      toast.success(t("ads.saved"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save ad settings");
     } finally {
@@ -82,11 +84,8 @@ export default function Advertisements() {
     <div className="mx-auto max-w-2xl space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Monetize your videos</CardTitle>
-          <CardDescription>
-            Ads are resolved from your account when a viewer plays any of your
-            videos — update them once and every existing embed picks them up.
-          </CardDescription>
+          <CardTitle>{t("ads.title")}</CardTitle>
+          <CardDescription>{t("ads.desc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Smartlink */}
@@ -97,10 +96,9 @@ export default function Advertisements() {
                   <MousePointerClick className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Smartlink</p>
+                  <p className="text-sm font-semibold">{t("ads.smartlink")}</p>
                   <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                    Opens your link once, when playback starts. Great for
-                    redirecting viewers to your site or app.
+                    {t("ads.smartlinkDesc")}
                   </p>
                 </div>
               </div>
@@ -110,7 +108,7 @@ export default function Advertisements() {
               />
             </div>
             <div className={cn("mt-4 transition-opacity", !form.smartlinkEnabled && "opacity-40")}>
-              <Label htmlFor="smartlink-url">Destination URL</Label>
+              <Label htmlFor="smartlink-url">{t("ads.destUrl")}</Label>
               <Input
                 id="smartlink-url"
                 type="url"
@@ -131,10 +129,9 @@ export default function Advertisements() {
                   <Share2 className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Social bar</p>
+                  <p className="text-sm font-semibold">{t("ads.socialBar")}</p>
                   <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                    A dismissible banner above the player. Your code runs in a
-                    sandboxed iframe and can never touch the app.
+                    {t("ads.socialBarDesc")}
                   </p>
                 </div>
               </div>
@@ -144,7 +141,7 @@ export default function Advertisements() {
               />
             </div>
             <div className={cn("mt-4 transition-opacity", !form.socialBarEnabled && "opacity-40")}>
-              <Label htmlFor="social-code">Banner code</Label>
+              <Label htmlFor="social-code">{t("ads.bannerCode")}</Label>
               <Textarea
                 id="social-code"
                 placeholder="<a href='https://…'>Follow us</a>"
@@ -165,10 +162,9 @@ export default function Advertisements() {
                   <Popcorn className="size-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">Popunder</p>
+                  <p className="text-sm font-semibold">{t("ads.popunder")}</p>
                   <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                    Fires once on the first interaction with the player, in a
-                    detached window that never touches your session.
+                    {t("ads.popunderDesc")}
                   </p>
                 </div>
               </div>
@@ -178,7 +174,7 @@ export default function Advertisements() {
               />
             </div>
             <div className={cn("mt-4 transition-opacity", !form.popunderEnabled && "opacity-40")}>
-              <Label htmlFor="popunder-code">Ad code</Label>
+              <Label htmlFor="popunder-code">{t("ads.adCode")}</Label>
               <Textarea
                 id="popunder-code"
                 rows={3}
@@ -194,12 +190,12 @@ export default function Advertisements() {
           <div className="flex items-center justify-between gap-3 pt-1">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ExternalLink className="size-3.5" />
-              Ads appear only on your public watch pages and embeds.
+              {t("ads.note")}
             </p>
             <Button onClick={save} disabled={saving}>
               {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
               <Megaphone className="mr-2 size-4" />
-              Save ad settings
+              {t("ads.save")}
             </Button>
           </div>
         </CardContent>

@@ -23,3 +23,22 @@ export function getVisitorId(): string {
     return generate();
   }
 }
+
+/**
+ * Anti-bot view proof (Platinum benefit). Returns `windowStart-hexHash` where
+ * the hash is computed in the browser with Web Crypto over
+ * `cawstream:view:<visitorId>:<windowStart>`. Only a real JS engine can
+ * produce it, so plain bots fetching the page cannot inflate view counts.
+ * The server accepts ±1 window (30s each) for clock skew.
+ */
+export async function viewProof(visitorId: string): Promise<string> {
+  const windowStart = Math.floor(Date.now() / 30_000);
+  const data = new TextEncoder().encode(
+    `cawstream:view:${visitorId}:${windowStart}`,
+  );
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `${windowStart}-${hex}`;
+}

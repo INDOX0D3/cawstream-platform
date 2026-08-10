@@ -1,8 +1,10 @@
 import { CawMark, Logo } from "@/components/brand";
+import { PricingCards } from "@/components/Pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { LanguageSwitcher, useI18n, type DictKey } from "@/lib/i18n";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import {
@@ -24,43 +26,50 @@ import {
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 
-const FEATURES = [
+const FEATURES: Array<{ icon: typeof UploadCloud; title: DictKey; text: DictKey }> = [
   {
     icon: UploadCloud,
-    title: "Real browser pipeline",
-    text: "Files are verified by their magic bytes, then duration, resolution, codec and a thumbnail are read from the actual file — no ffmpeg server required.",
+    title: "landing.feature1Title",
+    text: "landing.feature1Text",
   },
   {
     icon: CloudCog,
-    title: "Mux-ready transcoding",
-    text: "Drop in your Mux keys and every new upload becomes a cloud-transcoded HLS stream with an adaptive quality ladder.",
+    title: "landing.feature2Title",
+    text: "landing.feature2Text",
   },
   {
     icon: BarChart3,
-    title: "Honest analytics",
-    text: "Views, unique viewers and daily charts computed from real view records — hashed viewer IDs, never fingerprinting.",
+    title: "landing.feature3Title",
+    text: "landing.feature3Text",
   },
   {
     icon: Megaphone,
-    title: "Built-in monetization",
-    text: "Smartlinks, social bars and popunders are configured once and picked up by every existing embed automatically.",
+    title: "landing.feature4Title",
+    text: "landing.feature4Text",
   },
   {
     icon: Stamp,
-    title: "Watermark & branding",
-    text: "Overlay your brand on every player with configurable position, size and opacity — enforced by your own server settings.",
+    title: "landing.feature5Title",
+    text: "landing.feature5Text",
   },
   {
     icon: Code2,
-    title: "Embed anywhere",
-    text: "A single iframe embed code per video, plus direct MP4 and thumbnail URLs served through your own HTTP endpoints.",
+    title: "landing.feature6Title",
+    text: "landing.feature6Text",
   },
 ];
 
 const STEPS = [
-  { n: "01", title: "Upload", text: "Drag in an MP4, MOV, MKV or WEBM. Size limits are enforced server-side." },
-  { n: "02", title: "Process", text: "The browser or Mux verifies, extracts metadata and generates a thumbnail." },
-  { n: "03", title: "Embed", text: "Copy the iframe code and publish anywhere — analytics start counting." },
+  { n: "01", title: "landing.step1Title", text: "landing.step1Text" },
+  { n: "02", title: "landing.step2Title", text: "landing.step2Text" },
+  { n: "03", title: "landing.step3Title", text: "landing.step3Text" },
+];
+
+const STATS: Array<{ icon: typeof UploadCloud; value: DictKey; label: DictKey }> = [
+  { icon: UploadCloud, value: "landing.stat1Value", label: "landing.stat1Label" },
+  { icon: CloudCog, value: "landing.stat2Value", label: "landing.stat2Label" },
+  { icon: BarChart3, value: "landing.stat3Value", label: "landing.stat3Label" },
+  { icon: Code2, value: "landing.stat4Value", label: "landing.stat4Label" },
 ];
 
 function PlayerMock() {
@@ -111,12 +120,13 @@ function PlayerMock() {
 
 function Pipeline() {
   const stages = [
-    { icon: UploadCloud, label: "Upload" },
-    { icon: ShieldCheck, label: "Verify bytes" },
-    { icon: Sparkles, label: "Process" },
-    { icon: MonitorPlay, label: "Ready" },
-    { icon: Code2, label: "Embed" },
+    { icon: UploadCloud, label: "landing.step1Title" },
+    { icon: ShieldCheck, label: "landing.pipeVerify" },
+    { icon: Sparkles, label: "landing.step2Title" },
+    { icon: MonitorPlay, label: "landing.pipeReady" },
+    { icon: Code2, label: "landing.step3Title" },
   ];
+  const { t } = useI18n();
   return (
     <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
       {stages.map(({ icon: Icon, label }, i) => (
@@ -125,7 +135,7 @@ function Pipeline() {
             <span className="flex size-6 items-center justify-center rounded-full bg-brand/20 text-brand">
               <Icon className="size-3.5" />
             </span>
-            <span className="font-medium text-white/90">{label}</span>
+            <span className="font-medium text-white/90">{t(label)}</span>
           </div>
           {i < stages.length - 1 && <ArrowRight className="size-4 text-white/30" />}
         </div>
@@ -137,6 +147,7 @@ function Pipeline() {
 export default function Landing() {
   const config = useQuery(api.settings.getPublicConfig);
   const { isAuthenticated } = useAuth();
+  const { t } = useI18n();
 
   const brandName = config?.branding.brandName ?? "CawStream";
   const tagline = config?.branding.brandTagline ?? "Video hosting & streaming";
@@ -151,23 +162,25 @@ export default function Landing() {
             <Logo dark />
           </Link>
           <nav className="hidden items-center gap-6 text-sm text-white/60 md:flex">
-            <a href="#features" className="transition-colors hover:text-white">Features</a>
-            <a href="#how" className="transition-colors hover:text-white">How it works</a>
-            <a href="#monetize" className="transition-colors hover:text-white">Monetize</a>
+            <a href="#features" className="transition-colors hover:text-white">{t("landing.features")}</a>
+            <a href="#how" className="transition-colors hover:text-white">{t("landing.how")}</a>
+            <a href="#monetize" className="transition-colors hover:text-white">{t("landing.monetize")}</a>
+            <a href="#pricing" className="transition-colors hover:text-white">{t("landing.pricing")}</a>
           </nav>
           <div className="flex items-center gap-2">
+            <LanguageSwitcher className="border-white/15 bg-white/5 text-white/70 hover:text-white" />
             <Link to="/auth">
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-white/70 hover:bg-white/10 hover:text-white"
               >
-                Sign in
+                {t("landing.signIn")}
               </Button>
             </Link>
             <Link to={ctaHref}>
               <Button size="sm" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Get started
+                {t("landing.getStarted")}
               </Button>
             </Link>
           </div>
@@ -208,10 +221,10 @@ export default function Landing() {
               transition={{ duration: 0.55, delay: 0.05 }}
               className="text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl"
             >
-              Video hosting
+              {t("landing.heroTitle1")}
               <br />
-              without the{" "}
-              <span className="text-brand">middleman.</span>
+              {t("landing.heroTitle2")}{" "}
+              <span className="text-brand">{t("landing.heroTitle3")}</span>
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 16 }}
@@ -219,9 +232,7 @@ export default function Landing() {
               transition={{ duration: 0.55, delay: 0.12 }}
               className="mx-auto mt-5 max-w-xl text-base leading-7 text-white/60 sm:text-lg"
             >
-              {brandName} gives you a real upload pipeline, honest analytics and
-              embed-ready players — running on your own stack, from first upload
-              to every view.
+              {t("landing.heroDesc", { name: brandName })}
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -231,7 +242,7 @@ export default function Landing() {
             >
               <Link to={ctaHref}>
                 <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                  Start streaming
+                  {t("landing.startStreaming")}
                   <ArrowRight className="ml-2 size-4" />
                 </Button>
               </Link>
@@ -241,7 +252,7 @@ export default function Landing() {
                   variant="outline"
                   className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
                 >
-                  See how it works
+                  {t("landing.seeHow")}
                 </Button>
               </Link>
             </motion.div>
@@ -265,16 +276,11 @@ export default function Landing() {
       {/* ---------- Stats band ---------- */}
       <section className="border-y border-white/5 bg-white/[0.03]">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-4 py-10 text-center sm:px-6 md:grid-cols-4">
-          {[
-            { icon: UploadCloud, value: "Byte-level", label: "file verification" },
-            { icon: CloudCog, value: "2 backends", label: "browser or Mux HLS" },
-            { icon: BarChart3, value: "13-day", label: "daily view charts" },
-            { icon: Code2, value: "1 iframe", label: "embed per video" },
-          ].map(({ icon: Icon, value, label }) => (
+          {STATS.map(({ icon: Icon, value, label }) => (
             <div key={label} className="flex flex-col items-center gap-1.5">
               <Icon className="size-5 text-brand" />
-              <p className="text-lg font-semibold">{value}</p>
-              <p className="text-xs text-white/50">{label}</p>
+              <p className="text-lg font-semibold">{t(value)}</p>
+              <p className="text-xs text-white/50">{t(label)}</p>
             </div>
           ))}
         </div>
@@ -284,12 +290,9 @@ export default function Landing() {
       <section id="features" className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Everything a creator needs, nothing they don’t
+            {t("landing.featuresTitle")}
           </h2>
-          <p className="mt-3 text-white/60">
-            No mock statistics, no fake uploads — every number and button here
-            runs against your real data.
-          </p>
+          <p className="mt-3 text-white/60">{t("landing.featuresDesc")}</p>
         </div>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, text }, i) => (
@@ -304,8 +307,8 @@ export default function Landing() {
               <span className="flex size-10 items-center justify-center rounded-xl bg-brand/15 text-brand transition-transform group-hover:scale-110">
                 <Icon className="size-5" />
               </span>
-              <h3 className="mt-4 text-base font-semibold">{title}</h3>
-              <p className="mt-2 text-sm leading-6 text-white/55">{text}</p>
+              <h3 className="mt-4 text-base font-semibold">{t(title)}</h3>
+              <p className="mt-2 text-sm leading-6 text-white/55">{t(text)}</p>
             </motion.div>
           ))}
         </div>
@@ -316,12 +319,9 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              From file to embed in three steps
+              {t("landing.howTitle")}
             </h2>
-            <p className="mt-3 text-white/60">
-              The pipeline is real — uploads are validated, processed and served
-              end to end.
-            </p>
+            <p className="mt-3 text-white/60">{t("landing.howDesc")}</p>
           </div>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
             {STEPS.map(({ n, title, text }, i) => (
@@ -334,8 +334,8 @@ export default function Landing() {
                 className="relative rounded-2xl border border-white/8 bg-[#0b0b0c] p-6"
               >
                 <span className="text-sm font-semibold text-brand">{n}</span>
-                <h3 className="mt-2 text-lg font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/55">{text}</p>
+                <h3 className="mt-2 text-lg font-semibold">{t(title)}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/55">{t(text)}</p>
               </motion.div>
             ))}
           </div>
@@ -348,31 +348,27 @@ export default function Landing() {
           <div>
             <Badge variant="outline" className="mb-4 gap-1.5 border-brand/30 bg-brand/10 text-brand">
               <Megaphone className="size-3" />
-              Monetization
+              {t("landing.monetize")}
             </Badge>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Your videos, your ads, your rules
+              {t("landing.monetizeTitle")}
             </h2>
-            <p className="mt-4 max-w-lg text-white/60">
-              Configure smartlinks, social bars and popunders once. They’re
-              resolved from your account for every video you own — so existing
-              embeds pick up new ads with no re-embedding.
-            </p>
+            <p className="mt-4 max-w-lg text-white/60">{t("landing.monetizeDesc")}</p>
             <ul className="mt-6 space-y-3">
               {[
-                "Smartlink opens your destination when playback starts",
-                "Social bar renders in a sandboxed iframe — never touches your page",
-                "Popunder fires once per viewer, in a detached window",
+                "landing.monetize1",
+                "landing.monetize2",
+                "landing.monetize3",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2.5 text-sm text-white/70">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
-                  {item}
+                  {t(item as DictKey)}
                 </li>
               ))}
             </ul>
             <Link to={ctaHref} className="mt-8 inline-block">
               <Button className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Start monetizing
+                {t("landing.startMonetizing")}
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             </Link>
@@ -387,7 +383,7 @@ export default function Landing() {
           >
             <div className="flex items-center gap-2 border-b border-white/8 pb-3 text-xs text-white/50">
               <Gauge className="size-3.5" />
-              Ad settings · applied automatically to every embed
+              {t("landing.monetizeDesc")}
             </div>
             <div className="space-y-3 pt-4">
               {[
@@ -415,21 +411,40 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ---------- Pricing ---------- */}
+      <section id="pricing" className="border-y border-white/5 bg-white/[0.03]">
+        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              {t("pricing.title")}
+            </h2>
+            <p className="mt-3 text-white/60">{t("pricing.subtitle")}</p>
+          </div>
+          <div className="mt-12">
+            <PricingCards
+              onFree={() => {
+                window.location.href = "/auth";
+              }}
+            />
+          </div>
+          <p className="mt-6 text-center text-xs text-white/40">
+            {t("pricing.whatsapp")} · wa.me/6288272222789
+          </p>
+        </div>
+      </section>
+
       {/* ---------- CTA ---------- */}
       <section className="relative overflow-hidden border-t border-white/5">
         <div className="pointer-events-none absolute inset-0 bg-brand/10 blur-[100px]" />
         <div className="relative mx-auto max-w-3xl px-4 py-20 text-center sm:px-6">
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Your first video is minutes away
+            {t("landing.ctaTitle")}
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-white/60">
-            Create an account, upload a file, and embed it anywhere — all
-            running on your own deployment.
-          </p>
+          <p className="mx-auto mt-3 max-w-md text-white/60">{t("landing.ctaDesc")}</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to={ctaHref}>
               <Button size="lg" className="bg-brand text-brand-foreground hover:bg-brand/90">
-                Get started free
+                {t("landing.getStartedFree")}
                 <ArrowRight className="ml-2 size-4" />
               </Button>
             </Link>
@@ -439,7 +454,7 @@ export default function Landing() {
                 variant="outline"
                 className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
               >
-                Sign in
+                {t("landing.signIn")}
               </Button>
             </Link>
           </div>
@@ -452,10 +467,10 @@ export default function Landing() {
           <Link to="/">
             <Logo dark />
           </Link>
-          <p>© {new Date().getFullYear()} {brandName}. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} {brandName}. {t("landing.rights")}</p>
           <div className="flex items-center gap-4">
             <Link to="/auth" className="transition-colors hover:text-white">
-              Sign in
+              {t("landing.signIn")}
             </Link>
             <Link to="/dashboard" className="transition-colors hover:text-white">
               Dashboard

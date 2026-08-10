@@ -52,7 +52,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { toast } from "sonner";
 import { formatDuration } from "@/lib/format";
-import { getVisitorId } from "@/lib/visitor";
+import { useI18n } from "@/lib/i18n";
+import { getVisitorId, viewProof } from "@/lib/visitor";
 import { embedCode, socialPreviewUrl, videoUrls } from "@/lib/embed";
 import { cn } from "@/lib/utils";
 
@@ -185,6 +186,7 @@ export function VideoPlayer({
   const [levels, setLevels] = useState<Array<{ height?: number; width?: number }>>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const recordView = useMutation(api.views.recordView);
+  const { t } = useI18n();
 
   const isReady = video.status === "ready";
   const autoplay = userPrefs?.autoplay ?? player.autoplay;
@@ -360,7 +362,7 @@ export function VideoPlayer({
   const copyToClipboard = async (value: string, message: string) => {
     const ok = await copyText(value);
     if (ok) toast.success(message);
-    else toast.error("Could not copy — select and copy manually.");
+    else toast.error(t("copy.failed"));
   };
 
   const togglePlay = useCallback(() => {
@@ -402,12 +404,16 @@ export function VideoPlayer({
     togglePlay();
   };
 
-  const handlePlaying = () => {
+  const handlePlaying = async () => {
     setPlaying(true);
     setBuffering(false);
     if (!recorded.current && isReady) {
       recorded.current = true;
-      recordView({ publicId: video.publicId, visitorId: getVisitorId() }).catch(() => {
+      // Anti-bot proof (Platinum owners): a hash computed in the browser proves
+      // a real JS engine watched the video, not a script fetching the URL.
+      const visitorId = getVisitorId();
+      const proof = await viewProof(visitorId).catch(() => undefined);
+      recordView({ publicId: video.publicId, visitorId, proof }).catch(() => {
         // analytics must never break playback
       });
     }
@@ -523,18 +529,18 @@ export function VideoPlayer({
               <span className="flex size-11 items-center justify-center rounded-full bg-destructive/20 text-destructive">
                 <AlertTriangle className="size-5" />
               </span>
-              <p className="text-sm font-medium text-white">This video failed to process</p>
-              <p className="max-w-md text-xs text-white/60">{video.error ?? "Please try again later."}</p>
+              <p className="text-sm font-medium text-white">{t("player.failedProcess")}</p>
+              <p className="max-w-md text-xs text-white/60">{video.error ?? t("player.retryLater")}</p>
             </>
           ) : (
             <>
               <Loader2 className="size-6 animate-spin text-white/70" />
               <p className="text-sm font-medium text-white">
                 {video.status === "processing"
-                  ? "Processing this video…"
+                  ? t("player.processing")
                   : video.status === "queued"
-                    ? "Queued for processing…"
-                    : "This video is not available yet"}
+                    ? t("player.queued")
+                    : t("player.unavailable")}
               </p>
             </>
           )}
@@ -616,7 +622,7 @@ export function VideoPlayer({
       {!playing && (
         <button
           type="button"
-          aria-label="Play video"
+          aria-label={t("player.play")}
           onClick={togglePlay}
           className="absolute inset-0 z-10 flex items-center justify-center bg-black/25 transition-colors hover:bg-black/15"
         >
@@ -646,7 +652,7 @@ export function VideoPlayer({
           <div
             ref={seekBarRef}
             role="slider"
-            aria-label="Seek"
+            aria-label={t("player.seek")}
             aria-valuemin={0}
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(currentTime)}
@@ -678,7 +684,7 @@ export function VideoPlayer({
           <div className="mt-0.5 flex items-center gap-2">
             <button
               type="button"
-              aria-label={playing ? "Pause" : "Play"}
+              aria-label={playing ? t("player.pause") : t("player.playLabel")}
               onClick={togglePlay}
               className="flex size-9 shrink-0 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95"
               style={{ background: accent.color, color: accent.foreground }}
@@ -699,7 +705,7 @@ export function VideoPlayer({
               {player.pictureInPicture && document.pictureInPictureEnabled && (
                 <button
                   type="button"
-                  aria-label={isPip ? "Exit picture-in-picture" : "Picture-in-picture"}
+                  aria-label={isPip ? t("player.exitPip") : t("player.pip")}
                   onClick={togglePip}
                   className={cn(ICON_BTN, isPip && "bg-white/15 text-white")}
                 >
@@ -710,7 +716,7 @@ export function VideoPlayer({
               {/* Share */}
               <DropdownMenu onOpenChange={onMenuOpenChange}>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" aria-label="Share video" className={ICON_BTN}>
+                  <button type="button" aria-label={t("player.share")} className={ICON_BTN}>
                     <Share2 className="size-4" />
                   </button>
                 </DropdownMenuTrigger>
@@ -718,25 +724,25 @@ export function VideoPlayer({
                   <DropdownMenuContent side="top" align="end" className="w-60">
                     <DropdownMenuItem
                       onClick={() =>
-                        copyToClipboard(videoUrls(video.publicId).watch, "Video link copied")
+                        copyToClipboard(videoUrls(video.publicId).watch, t("player.linkCopied"))
                       }
                     >
                       <Link2 className="mr-2 size-4" />
-                      Copy video link
+                      {t("player.copyLink")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => copyToClipboard(embedCode(video.publicId), "Embed code copied")}
+                      onClick={() => copyToClipboard(embedCode(video.publicId), t("player.embedCopied"))}
                     >
                       <Code2 className="mr-2 size-4" />
-                      Copy embed code
+                      {t("player.copyEmbed")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() =>
-                        copyToClipboard(socialPreviewUrl(video.publicId), "Social preview link copied")
+                        copyToClipboard(socialPreviewUrl(video.publicId), t("player.socialCopied"))
                       }
                     >
                       <Globe className="mr-2 size-4" />
-                      Copy social preview link
+                      {t("player.copySocial")}
                     </DropdownMenuItem>
                     {typeof navigator !== "undefined" && "share" in navigator && (
                       <>
@@ -749,7 +755,7 @@ export function VideoPlayer({
                           }}
                         >
                           <Share className="mr-2 size-4" />
-                          Share with device…
+                          {t("player.deviceShare")}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -760,14 +766,14 @@ export function VideoPlayer({
               {/* Settings */}
               <DropdownMenu onOpenChange={onMenuOpenChange}>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" aria-label="Player settings" className={ICON_BTN}>
+                  <button type="button" aria-label={t("player.settings")} className={ICON_BTN}>
                     <Settings className="size-4" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuContent side="top" align="end" className="w-56">
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Playback speed</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>{t("player.speed")}</DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
                           <DropdownMenuRadioGroup
@@ -789,7 +795,7 @@ export function VideoPlayer({
                     </DropdownMenuSub>
                     {levels.length > 0 && (
                       <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Quality</DropdownMenuSubTrigger>
+                        <DropdownMenuSubTrigger>{t("player.quality")}</DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
                           <DropdownMenuSubContent>
                             <DropdownMenuRadioGroup
@@ -800,10 +806,10 @@ export function VideoPlayer({
                                 if (hlsRef.current) hlsRef.current.currentLevel = idx;
                               }}
                             >
-                              <DropdownMenuRadioItem value="-1">Auto</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="-1">{t("player.auto")}</DropdownMenuRadioItem>
                               {levels.map((l, i) => (
                                 <DropdownMenuRadioItem key={`${l.height ?? "?"}-${i}`} value={String(i)}>
-                                  {l.height ? `${l.height}p` : `Level ${i + 1}`}
+                                  {l.height ? `${l.height}p` : t("player.level", { n: i + 1 })}
                                 </DropdownMenuRadioItem>
                               ))}
                             </DropdownMenuRadioGroup>
@@ -817,7 +823,7 @@ export function VideoPlayer({
 
               <button
                 type="button"
-                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-label={isFullscreen ? t("player.exitFullscreen") : t("player.fullscreen")}
                 onClick={toggleFullscreen}
                 className={ICON_BTN}
               >
