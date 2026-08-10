@@ -97,6 +97,7 @@ export default function Videos() {
               video={video as VideoCardVideo}
               to={`/v/${video.publicId}`}
               onEdit={() => setSelected(video)}
+              showLinks
             />
           ))}
         </div>
