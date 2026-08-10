@@ -1,7 +1,7 @@
-/** Build the public URLs for a video (relative to the app origin). The watch
- *  (/v/...) and embed (/e/...) pages carry the play-button link-preview meta
- *  tags themselves, so any of these links previews as a video card when pasted
- *  into browsers and JS-rendering crawlers. */
+/** Build the public URLs for a video (relative to the app origin). These are
+ *  the plain app URLs used as iframe sources, download links, etc. For links
+ *  meant to be pasted in chats / social media use `cloakPreviewUrl` instead,
+ *  so the play-button video preview always shows up. */
 export function videoUrls(publicId: string) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   return {
@@ -10,6 +10,27 @@ export function videoUrls(publicId: string) {
     embed: `${origin}/e/${publicId}`,
     watch: `${origin}/v/${publicId}`,
   };
+}
+
+/** The Convex HTTP site origin (e.g. https://…-….convex.site) where the
+ *  server-rendered /v/ and /e/ cloak pages live. Derived from the deployment
+ *  URL because HTTP actions are served from the `.convex.site` host. */
+export function convexSiteUrl(): string {
+  const deployment = (import.meta.env.VITE_CONVEX_URL as string | undefined) ?? "";
+  const site = deployment.replace(/\.convex\.cloud$/, ".convex.site");
+  return site !== deployment ? site : "";
+}
+
+/** A shareable link that always previews as a video card: the server-rendered
+ *  /v/ or /e/ cloak page (static og:/twitter: meta with the play-button
+ *  poster) which then redirects visitors to the real app page. Paste it into
+ *  WhatsApp, X, Facebook, Telegram, iMessage, Discord, etc. Falls back to the
+ *  plain app URL when the Convex site origin cannot be derived. */
+export function cloakPreviewUrl(publicId: string, kind: "v" | "e" = "v"): string {
+  const site = convexSiteUrl();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  if (!site) return `${origin}/${kind}/${publicId}`;
+  return `${site}/${kind}/${publicId}?to=${encodeURIComponent(origin)}`;
 }
 
 export function embedCode(

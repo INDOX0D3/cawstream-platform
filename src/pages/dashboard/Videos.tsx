@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
-import { embedCode, videoUrls } from "@/lib/embed";
+import { cloakPreviewUrl, embedCode, videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
@@ -157,6 +157,7 @@ function VideoDetailDialog({
   const [autoFullEmbed, setAutoFullEmbed] = useState(true); // embeds are fullscreen by default
 
   const urls = videoUrls(video.publicId);
+  const watchShare = cloakPreviewUrl(video.publicId, "v");
   const embed = embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed });
 
   const save = async () => {
@@ -414,8 +415,8 @@ function VideoDetailDialog({
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
                   <span className="truncate text-muted-foreground">{t("videos.watchPage")}</span>
                   <span className="flex items-center gap-2">
-                    <code className="max-w-[220px] truncate text-xs">{urls.watch}</code>
-                    <CopyButton value={urls.watch} size="icon" label={t("videos.copyWatchUrl")} />
+                    <code className="max-w-[220px] truncate text-xs">{watchShare}</code>
+                    <CopyButton value={watchShare} size="icon" label={t("videos.copyWatchUrl")} />
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">

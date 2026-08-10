@@ -53,7 +53,7 @@ import { toast } from "sonner";
 import { formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { getVisitorId, viewProof } from "@/lib/visitor";
-import { embedCode, videoUrls } from "@/lib/embed";
+import { cloakPreviewUrl, embedCode, videoUrls } from "@/lib/embed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -723,7 +723,7 @@ export function VideoPlayer({
                   <DropdownMenuContent side="top" align="end" className="w-60">
                     <DropdownMenuItem
                       onClick={() =>
-                        copyToClipboard(videoUrls(video.publicId).watch, t("player.linkCopied"))
+                        copyToClipboard(cloakPreviewUrl(video.publicId, "v"), t("player.linkCopied"))
                       }
                     >
                       <Link2 className="mr-2 size-4" />
@@ -741,7 +741,7 @@ export function VideoPlayer({
                         <DropdownMenuItem
                           onClick={() => {
                             void navigator
-                              .share({ title: video.title, url: videoUrls(video.publicId).watch })
+                              .share({ title: video.title, url: cloakPreviewUrl(video.publicId, "v") })
                               .catch(() => undefined);
                           }}
                         >

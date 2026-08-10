@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { embedCode } from "@/lib/embed";
+import { cloakPreviewUrl, embedCode } from "@/lib/embed";
 import { formatCompact, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { applyVideoMeta } from "@/lib/seo";
@@ -149,7 +149,7 @@ export default function Watch() {
               value={embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed })}
               label={t("watch.embed")}
             />
-            <CopyButton value={window.location.href} label={t("watch.copyLink")} />
+            <CopyButton value={cloakPreviewUrl(video.publicId, "v")} label={t("watch.copyLink")} />
           </div>
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
