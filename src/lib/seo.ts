@@ -28,6 +28,57 @@ function upsertMeta(attr: "name" | "property", key: string, content: string) {
   el.setAttribute("content", content);
 }
 
+export interface SiteMeta {
+  name: string;
+  metaTitle: string;
+  metaDescription: string;
+  metaKeywords: string;
+  logoUrl: string;
+  iconUrl: string;
+}
+
+function upsertLink(rel: string, href: string) {
+  let el = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", rel);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("href", href);
+}
+
+/** Apply the site-wide SEO defaults (title, description, keywords, favicon,
+ *  og/twitter basics) read from Admin → Branding. Runs on every page load;
+ *  video pages override the tags with real video data afterwards. */
+export function applySiteMeta(site: SiteMeta) {
+  const title =
+    site.metaTitle || (site.name ? `${site.name} — Video hosting & streaming` : "CawStream");
+  const description =
+    site.metaDescription ||
+    "Upload, host and stream videos with a custom player, embed codes, play-button link previews and honest analytics.";
+  document.title = title;
+  upsertMeta("name", "description", description);
+  if (site.metaKeywords) {
+    upsertMeta("name", "keywords", site.metaKeywords);
+  } else {
+    document.head
+      .querySelectorAll('meta[name="keywords"]')
+      .forEach((el) => el.remove());
+  }
+  if (site.iconUrl) upsertLink("icon", site.iconUrl);
+  if (site.logoUrl) {
+    upsertMeta("property", "og:image", site.logoUrl);
+    upsertLink("apple-touch-icon", site.logoUrl);
+  }
+  upsertMeta("property", "og:type", "website");
+  upsertMeta("property", "og:site_name", site.name || "CawStream");
+  upsertMeta("property", "og:title", title);
+  upsertMeta("property", "og:description", description);
+  upsertMeta("name", "twitter:card", "summary_large_image");
+  upsertMeta("name", "twitter:title", title);
+  upsertMeta("name", "twitter:description", description);
+}
+
 /** Apply video-specific meta tags + title to the current document. */
 export function applyVideoMeta(meta: VideoMeta) {
   document.title = meta.title;

@@ -8,7 +8,7 @@ import {
 import { videoUrls } from "@/lib/embed";
 import { formatCompact, formatDuration, formatRelative } from "@/lib/format";
 import { useI18n, type DictKey } from "@/lib/i18n";
-import { Eye, ImageIcon, Link2, Pencil, Play } from "lucide-react";
+import { Eye, ImageIcon, Link2, Pencil, Play, SquareArrowOutUpRight } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,12 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
       labelKey: "card.embedLink" as DictKey,
       hintKey: "card.embedHint" as DictKey,
       value: urls.embed,
+    },
+    {
+      icon: <SquareArrowOutUpRight className="size-3.5" />,
+      labelKey: "card.watchLink" as DictKey,
+      hintKey: "card.watchHint" as DictKey,
+      value: urls.watch,
     },
     {
       icon: <ImageIcon className="size-3.5" />,

@@ -42,6 +42,8 @@ export function sanitizeDescription(description: string): string {
 export const MAX_AD_CODE_LENGTH = 10_000;
 export const MAX_AD_URL_LENGTH = 2_048;
 
+export type AdFrequency = "session" | "always";
+
 export interface AdSettingsInput {
   smartlinkEnabled: boolean;
   smartlinkUrl?: string;
@@ -49,6 +51,8 @@ export interface AdSettingsInput {
   socialBarCode?: string;
   popunderEnabled: boolean;
   popunderCode?: string;
+  /** "session" = once per browsing session (default), "always" = every click. */
+  frequency?: AdFrequency;
 }
 
 function validateHttpUrl(value: string | undefined, label: string): string {
@@ -89,6 +93,7 @@ export function validateAdSettings(input: AdSettingsInput): AdSettingsInput {
     socialBarCode: validateAdCode(input.socialBarCode, "Social bar code"),
     popunderEnabled: Boolean(input.popunderEnabled),
     popunderCode: validateAdCode(input.popunderCode, "Popunder code"),
+    frequency: input.frequency === "always" ? "always" : "session",
   };
 }
 

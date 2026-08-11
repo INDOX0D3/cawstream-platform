@@ -5,21 +5,25 @@
  * server from VIDEO → OWNER → USER AD SETTINGS (see src/convex/ads.ts). This
  * component only *renders* them inside the public player/embed context.
  *
- * Behavior:
- *  - Smartlink opens in a new tab the first time the viewer clicks the player,
- *    on every screen (watch page and embed), at most once per browsing session
- *    (sessionStorage — so it never nags the same visitor on every video).
- *  - Social Bar is a banner shown continuously above the player while enabled.
- *    Its code runs inside a sandboxed iframe (sandbox="allow-scripts") so it
- *    can never touch the app DOM, cookies or session.
- *  - Popunder opens once per session on the first interaction with the player,
- *    in a fresh popup window whose `opener` is detached immediately, never
- *    inside the app.
+ * Frequency (set per user in Advertisements):
+ *  - "session" (default): smartlink + popunder fire at most once per browsing
+ *    session (sessionStorage), on the first click inside the player.
+ *  - "always": they fire on every click anywhere in the player screen, on the
+ *    watch page and the embed alike.
+ * In both modes the Social Bar banner stays visible continuously while enabled.
+ *
+ * Isolation rules:
+ *  - Social Bar code runs inside a sandboxed iframe (sandbox="allow-scripts")
+ *    so it can never touch the app DOM, cookies or session.
+ *  - Popunder code runs in a fresh popup window whose `opener` is detached
+ *    immediately, never inside the app.
  *  - Smartlink is a plain https:// link opened with noopener.
  *  - Nothing here is ever rendered on dashboard, admin or auth pages.
  */
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+
+export type AdFrequency = "session" | "always";
 
 export interface AdsConfig {
   smartlinkEnabled: boolean;
@@ -28,6 +32,8 @@ export interface AdsConfig {
   socialBarCode: string;
   popunderEnabled: boolean;
   popunderCode: string;
+  /** "session" = once per browsing session (default), "always" = every click. */
+  frequency: AdFrequency;
 }
 
 export const EMPTY_ADS: AdsConfig = {
@@ -37,6 +43,7 @@ export const EMPTY_ADS: AdsConfig = {
   socialBarCode: "",
   popunderEnabled: false,
   popunderCode: "",
+  frequency: "session",
 };
 
 export function isValidSmartlink(url: string): boolean {
@@ -136,11 +143,11 @@ export function AdManager({
 }) {
   const firedRef = useRef(false);
 
-  // Smartlink + popunder — fire on the first click inside the player, each at
-  // most once per browsing session.
+  // Smartlink + popunder — fire on clicks inside the player. In "session" mode
+  // each fires at most once per browsing session; in "always" mode they fire on
+  // every click (all parts of the player screen, watch page and embed).
   useEffect(() => {
-    const smartlinkOn =
-      ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
+    const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
     const popunderOn = ads.popunderEnabled && ads.popunderCode;
     if (!smartlinkOn && !popunderOn) return;
 
@@ -148,15 +155,21 @@ export function AdManager({
     if (!el) return;
 
     const handler = () => {
-      if (firedRef.current) return; // guard against re-entrancy in one mount
+      const always = ads.frequency === "always";
+      if (!always && firedRef.current) return; // session mode: one per mount
       firedRef.current = true;
-      if (smartlinkOn && !sessionFired(smartlinkKey(ads.smartlinkUrl))) {
-        markSessionFired(smartlinkKey(ads.smartlinkUrl));
-        window.open(ads.smartlinkUrl, "_blank", "noopener");
+
+      if (smartlinkOn) {
+        if (always || !sessionFired(smartlinkKey(ads.smartlinkUrl))) {
+          markSessionFired(smartlinkKey(ads.smartlinkUrl));
+          window.open(ads.smartlinkUrl, "_blank", "noopener");
+        }
       }
-      if (popunderOn && !sessionFired(popunderKey(ads.popunderCode))) {
-        markSessionFired(popunderKey(ads.popunderCode));
-        openPopunder(ads.popunderCode);
+      if (popunderOn) {
+        if (always || !sessionFired(popunderKey(ads.popunderCode))) {
+          markSessionFired(popunderKey(ads.popunderCode));
+          openPopunder(ads.popunderCode);
+        }
       }
     };
 
@@ -167,6 +180,7 @@ export function AdManager({
     ads.smartlinkUrl,
     ads.popunderEnabled,
     ads.popunderCode,
+    ads.frequency,
     containerRef,
   ]);
 

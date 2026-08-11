@@ -43,6 +43,16 @@ export interface SmtpSettings {
 export interface SiteSettings {
   name: string;
   supportEmail: string;
+  /** <title> tag + og:title — the browser tab / search result headline. */
+  metaTitle: string;
+  /** meta description shown under the title in search engines and link previews. */
+  metaDescription: string;
+  /** meta keywords (comma separated). */
+  metaKeywords: string;
+  /** Uploaded site logo (public URL) shown in headers and link previews. */
+  logoUrl: string;
+  /** Uploaded favicon / site icon (public URL). */
+  iconUrl: string;
 }
 
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
@@ -82,6 +92,12 @@ export const DEFAULT_SMTP: SmtpSettings = {
 export const DEFAULT_SITE: SiteSettings = {
   name: "CawStream",
   supportEmail: "",
+  metaTitle: "CawStream — Video hosting & streaming",
+  metaDescription:
+    "Upload, host and stream videos with a custom player, embed codes, play-button link previews and honest analytics.",
+  metaKeywords: "video hosting, video streaming, video embed, cawstream",
+  logoUrl: "",
+  iconUrl: "",
 };
 
 export const SETTING_KEYS = {

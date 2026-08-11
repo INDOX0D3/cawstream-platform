@@ -178,7 +178,9 @@ const en = {
   "videos.reprocessed": "Video reprocessed and ready again",
   "card.links": "Copy links",
   "card.embedLink": "Embed link",
-  "card.embedHint": "Opens the fullscreen player",
+  "card.embedHint": "Direct /e/ link — opens the fullscreen player",
+  "card.watchLink": "Video URL",
+  "card.watchHint": "Public watch page link",
   "card.thumbLink": "Thumbnail",
   "card.thumbHint": "Direct thumbnail image URL",
   "card.linksTip":
@@ -253,6 +255,11 @@ const en = {
   "ads.popunderDesc":
     "Opens once per session on the first interaction with the player, in a detached window that never touches your session.",
   "ads.adCode": "Ad code",
+  "ads.frequency": "Ad frequency",
+  "ads.frequencyDesc":
+    "How often the smartlink and popunder fire for viewers. The social bar stays visible continuously either way.",
+  "ads.freqSession": "Once per session",
+  "ads.freqAlways": "Always — on every click",
   "ads.note": "Ads appear only on your public watch pages and embeds.",
   "ads.save": "Save ad settings",
   "ads.saved": "Ad settings saved — active on all your embeds",
@@ -623,13 +630,21 @@ const id: Partial<Record<DictKey, string>> = {
   "videos.reprocessed": "Video diproses ulang dan siap lagi",
   "card.links": "Salin link",
   "card.embedLink": "Link embed",
-  "card.embedHint": "Membuka player fullscreen",
+  "card.embedHint": "Link /e/ langsung — membuka player fullscreen",
+  "card.watchLink": "URL video",
+  "card.watchHint": "Link halaman tonton publik",
   "card.thumbLink": "Thumbnail",
   "card.thumbHint": "URL gambar thumbnail langsung",
   "card.linksTip":
     "Tips: tempel link halaman video di WhatsApp, X, atau Facebook untuk menampilkan kartu video dengan thumbnail ber-logo play.",
 
   // watch page + player
+  // advertisements (id)
+  "ads.frequency": "Frekuensi iklan",
+  "ads.frequencyDesc":
+    "Seberapa sering smartlink dan popunder muncul untuk penonton. Social bar tetap tampil terus-menerus di kedua mode.",
+  "ads.freqSession": "Sekali per sesi",
+  "ads.freqAlways": "Selalu — setiap klik",
   "watch.notFound": "Video tidak ditemukan",
   "watch.notFoundDesc": "Video mungkin telah dihapus atau tidak pernah ada.",
   "watch.back": "Kembali ke CawStream",

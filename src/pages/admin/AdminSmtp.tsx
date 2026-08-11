@@ -22,7 +22,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import { formatDateTime } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { Loader2, Mail, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ interface SmtpForm {
 export default function AdminSmtp() {
   const settings = useQuery(api.settings.getAdminSettings);
   const updateSettings = useMutation(api.settings.updateSettings);
-  const sendTestEmail = useMutation(api.mailer.sendTestEmail);
+  const sendTestEmail = useAction(api.mailSmtp.sendTestEmail);
   const sentEmails = useQuery(api.mailer.listSentEmails);
 
   const [form, setForm] = useState<SmtpForm | null>(null);

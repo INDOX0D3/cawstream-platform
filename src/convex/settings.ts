@@ -50,7 +50,15 @@ export const getPublicConfig = query({
     return {
       player,
       branding,
-      site: { name: site.name, supportEmail: site.supportEmail },
+      site: {
+        name: site.name,
+        supportEmail: site.supportEmail,
+        metaTitle: site.metaTitle,
+        metaDescription: site.metaDescription,
+        metaKeywords: site.metaKeywords,
+        logoUrl: site.logoUrl,
+        iconUrl: site.iconUrl,
+      },
       limits: {
         maxUploadBytes: limits.maxUploadBytes,
         allowedTypes: [...limits.allowedTypes],
@@ -181,6 +189,11 @@ export const updateSettings = mutation({
       const next: SiteSettings = {
         name: String(value.name ?? base.name).slice(0, 60) || "CawStream",
         supportEmail: String(value.supportEmail ?? base.supportEmail ?? "").slice(0, 255),
+        metaTitle: String(value.metaTitle ?? base.metaTitle ?? "").slice(0, 160) || base.metaTitle,
+        metaDescription: String(value.metaDescription ?? base.metaDescription ?? "").slice(0, 500),
+        metaKeywords: String(value.metaKeywords ?? base.metaKeywords ?? "").slice(0, 500),
+        logoUrl: String(value.logoUrl ?? base.logoUrl ?? "").slice(0, 2048),
+        iconUrl: String(value.iconUrl ?? base.iconUrl ?? "").slice(0, 2048),
       };
       await setSetting(ctx, "site", next);
       return next;
@@ -196,5 +209,25 @@ export const updateSettings = mutation({
     };
     await setSetting(ctx, "limits", next);
     return { maxUploadBytes: next.maxUploadBytes };
+  },
+});
+
+/** Admin: get a signed storage upload URL (for logo / favicon uploads). */
+export const getUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/** Admin: turn an uploaded storage id into its public URL (for logo / favicon). */
+export const resolveUpload = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => {
+    await requireAdmin(ctx);
+    const url = await ctx.storage.getUrl(storageId);
+    if (!url) throw new Error("The uploaded file could not be resolved.");
+    return url;
   },
 });

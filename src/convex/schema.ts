@@ -146,6 +146,8 @@ const schema = defineSchema(
       socialBarCode: v.optional(v.string()),
       popunderEnabled: v.boolean(),
       popunderCode: v.optional(v.string()),
+      // how often ads fire for viewers: "session" (once per session) | "always" (every click)
+      frequency: v.union(v.literal("session"), v.literal("always")),
       updatedAt: v.optional(v.number()),
     }).index("by_user", ["userId"]),
 

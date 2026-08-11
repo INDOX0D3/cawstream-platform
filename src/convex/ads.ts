@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { GenericId } from "convex/values";
 import { QueryCtx, mutation, query } from "./_generated/server";
 import { requireUser } from "./users";
-import { validateAdSettings } from "./lib/validation";
+import { validateAdSettings, type AdFrequency } from "./lib/validation";
 
 export interface UserAdSettings {
   smartlinkEnabled: boolean;
@@ -11,6 +11,8 @@ export interface UserAdSettings {
   socialBarCode: string;
   popunderEnabled: boolean;
   popunderCode: string;
+  /** "session" = once per browsing session (default), "always" = every click. */
+  frequency: AdFrequency;
   updatedAt?: number;
 }
 
@@ -21,6 +23,7 @@ export const DEFAULT_AD_SETTINGS: UserAdSettings = {
   socialBarCode: "",
   popunderEnabled: false,
   popunderCode: "",
+  frequency: "session",
 };
 
 /**
@@ -44,6 +47,7 @@ export async function getAdSettingsForUser(
     socialBarCode: row.socialBarCode ?? "",
     popunderEnabled: row.popunderEnabled,
     popunderCode: row.popunderCode ?? "",
+    frequency: row.frequency ?? "session",
     updatedAt: row.updatedAt,
   };
 }
@@ -64,6 +68,7 @@ export const updateAdSettings = mutation({
     socialBarCode: v.optional(v.string()),
     popunderEnabled: v.boolean(),
     popunderCode: v.optional(v.string()),
+    frequency: v.optional(v.union(v.literal("session"), v.literal("always"))),
   },
   handler: async (ctx, input) => {
     const user = await requireUser(ctx);
@@ -72,7 +77,12 @@ export const updateAdSettings = mutation({
       .query("userAdSettings")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
-    const data = { ...cleaned, userId: user._id, updatedAt: Date.now() };
+    const data = {
+      ...cleaned,
+      frequency: cleaned.frequency ?? "session",
+      userId: user._id,
+      updatedAt: Date.now(),
+    };
     if (existing) {
       await ctx.db.patch(existing._id, data);
     } else {

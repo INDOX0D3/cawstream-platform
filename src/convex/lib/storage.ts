@@ -29,17 +29,31 @@ export const storageService = {
     }
   },
 
-  /** Delete every blob referenced by a video record. */
+  /** Delete every blob referenced by a video record. Each blob is deleted
+   *  defensively (never throws), so an already-gone or invalid storage id can
+   *  never abort the row deletion — deleting a video always succeeds. */
   async deleteVideoBlobs(
     ctx: { storage: Pick<StorageLike, "delete"> },
     video: {
       sourceStorageId?: GenericId<"_storage"> | null;
       renditionStorageId?: GenericId<"_storage"> | null;
       thumbnailStorageId?: GenericId<"_storage"> | null;
+      socialThumbnailStorageId?: GenericId<"_storage"> | null;
     },
   ) {
-    await this.delete(ctx, video.sourceStorageId ?? undefined);
-    await this.delete(ctx, video.renditionStorageId ?? undefined);
-    await this.delete(ctx, video.thumbnailStorageId ?? undefined);
+    const ids = [
+      video.sourceStorageId,
+      video.renditionStorageId,
+      video.thumbnailStorageId,
+      video.socialThumbnailStorageId,
+    ];
+    for (const id of ids) {
+      if (!id) continue;
+      try {
+        await ctx.storage.delete(id);
+      } catch (error) {
+        console.error("[cawstream][storage] failed to delete blob:", error);
+      }
+    }
   },
 };

@@ -5,11 +5,13 @@ import { RequireAdmin } from "@/components/RequireAdmin";
 import { AdminShell, AppShell } from "@/components/layout/Shell";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useQuery } from "convex/react";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { I18nProvider } from "@/lib/i18n";
+import { applySiteMeta } from "@/lib/seo";
+import { api } from "@/convex/_generated/api";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -104,6 +106,24 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
 
 
+/** Keeps the document <head> in sync with the site-wide SEO settings
+ *  (title, description, keywords, favicon/logo) from Admin → Branding. */
+function SiteMetaSyncer() {
+  const config = useQuery(api.settings.getPublicConfig);
+  useEffect(() => {
+    if (!config) return;
+    applySiteMeta({
+      name: config.site.name,
+      metaTitle: config.site.metaTitle,
+      metaDescription: config.site.metaDescription,
+      metaKeywords: config.site.metaKeywords,
+      logoUrl: config.site.logoUrl,
+      iconUrl: config.site.iconUrl,
+    });
+  }, [config]);
+  return null;
+}
+
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
@@ -136,6 +156,7 @@ createRoot(document.getElementById("root")!).render(
       </ToolbarErrorBoundary>
       <ConvexAuthProvider client={convex}>
         <I18nProvider>
+          <SiteMetaSyncer />
           <BrowserRouter>
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>

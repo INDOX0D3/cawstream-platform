@@ -2,6 +2,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
@@ -19,6 +26,7 @@ interface AdsForm {
   socialBarCode: string;
   popunderEnabled: boolean;
   popunderCode: string;
+  frequency: "session" | "always";
 }
 
 const EMPTY: AdsForm = {
@@ -28,6 +36,7 @@ const EMPTY: AdsForm = {
   socialBarCode: "",
   popunderEnabled: false,
   popunderCode: "",
+  frequency: "session",
 };
 
 export default function Advertisements() {
@@ -46,6 +55,7 @@ export default function Advertisements() {
         socialBarCode: existing.socialBarCode ?? "",
         popunderEnabled: existing.popunderEnabled,
         popunderCode: existing.popunderCode ?? "",
+        frequency: existing.frequency ?? "session",
       });
     }
   }, [existing, form]);
@@ -71,6 +81,7 @@ export default function Advertisements() {
         socialBarCode: form.socialBarCode,
         popunderEnabled: form.popunderEnabled,
         popunderCode: form.popunderCode,
+        frequency: form.frequency,
       });
       toast.success(t("ads.saved"));
     } catch (error) {
@@ -88,6 +99,35 @@ export default function Advertisements() {
           <CardDescription>{t("ads.desc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Frequency */}
+          <div className="rounded-xl border p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <Popcorn className="size-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{t("ads.frequency")}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {t("ads.frequencyDesc")}
+                  </p>
+                </div>
+              </div>
+              <Select
+                value={form.frequency}
+                onValueChange={(v) => set("frequency", v as AdsForm["frequency"])}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="session">{t("ads.freqSession")}</SelectItem>
+                  <SelectItem value="always">{t("ads.freqAlways")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Smartlink */}
           <div className="rounded-xl border p-4">
             <div className="flex items-start justify-between gap-4">
