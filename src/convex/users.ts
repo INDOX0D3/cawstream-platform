@@ -197,6 +197,27 @@ export const isUsernameTaken = query({
 });
 
 /**
+ * Whether an email already has a password account. Checked by the sign-up
+ * form BEFORE calling the auth signUp flow: Convex Auth does NOT reject a
+ * signUp with an existing email — it silently re-sends a verification code
+ * for the old account, which lets an already-registered user "sign up again".
+ */
+export const isEmailRegistered = query({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return false;
+    const existing = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", "password").eq("providerAccountId", normalized),
+      )
+      .first();
+    return existing !== null;
+  },
+});
+
+/**
  * Change the account password (Security page). Verifies the current password
  * against the stored Scrypt hash, re-hashes the new one, and invalidates every
  * other active session while keeping the current one signed in.

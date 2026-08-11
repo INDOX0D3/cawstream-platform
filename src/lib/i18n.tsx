@@ -328,7 +328,7 @@ const en = {
   "auth.create": "Create account",
   "auth.signingIn": "Signing in…",
   "auth.creating": "Creating account…",
-  "auth.newHere": "New to CawStream?",
+  "auth.newHere": "New to {site}?",
   "auth.haveAccount": "Already have an account?",
   "auth.createOne": "Create one",
   "auth.checkEmail": "Check your email",
@@ -360,6 +360,7 @@ const en = {
   "auth.useOtherEmail": "Use a different email",
   "auth.alreadyExists":
     "An account with this email already exists — sign in instead, or use “Forgot password”.",
+  "auth.signInInstead": "Sign in instead",
   "auth.verifiedSignedIn": "Password updated — you're signed in",
 
   // landing
@@ -708,7 +709,7 @@ const id: Partial<Record<DictKey, string>> = {
   "auth.create": "Buat akun",
   "auth.signingIn": "Masuk…",
   "auth.creating": "Membuat akun…",
-  "auth.newHere": "Baru di CawStream?",
+  "auth.newHere": "Baru di {site}?",
   "auth.haveAccount": "Sudah punya akun?",
   "auth.createOne": "Buat akun",
   "auth.checkEmail": "Cek email Anda",
@@ -740,6 +741,7 @@ const id: Partial<Record<DictKey, string>> = {
   "auth.useOtherEmail": "Gunakan email lain",
   "auth.alreadyExists":
     "Akun dengan email ini sudah ada — masuk saja, atau gunakan “Lupa kata sandi”.",
+  "auth.signInInstead": "Masuk saja",
   "auth.verifiedSignedIn": "Kata sandi diperbarui — Anda sudah masuk",
 
   // landing

@@ -43,7 +43,9 @@ async function sendVerificationRequest({
         {
           to: email,
           otp: token,
-          appName: process.env.VLY_APP_NAME || "CawStream",
+          // Empty on purpose: the SMTP sender (mailSmtp.sendOtp) fills in the
+          // configured site name from Admin → Branding as the email subject.
+          appName: "",
         },
         {
           headers: { "x-caw-otp-key": OTP_KEY },

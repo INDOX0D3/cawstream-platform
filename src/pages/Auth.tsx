@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguageSwitcher, useI18n } from "@/lib/i18n";
-import { useMutation } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -73,7 +73,10 @@ const BULLETS = [
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
   const { t } = useI18n();
+  const convex = useConvex();
   const completeSignup = useMutation(api.users.completeSignup);
+  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteName = siteConfig?.site.name || "CawStream";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveRedirectAfterAuth(searchParams.get("returnTo"), redirectAfterAuth);
@@ -83,6 +86,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestSignIn, setSuggestSignIn] = useState(false);
   const didNavigate = useRef(false);
 
   useEffect(() => {
@@ -123,6 +127,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuggestSignIn(false);
     const form = new FormData(e.currentTarget);
     const username = String(form.get("username") ?? "").trim();
     const name = String(form.get("name") ?? "").trim();
@@ -145,6 +150,22 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       setIsLoading(false);
       return;
     }
+
+    // Convex Auth does not reject a signUp with an existing email — it just
+    // re-sends a verification code for the old account. Check first and tell
+    // the user their email is already registered, suggesting to sign in.
+    try {
+      const registered = await convex.query(api.users.isEmailRegistered, { email });
+      if (registered) {
+        setSuggestSignIn(true);
+        setError(t("auth.alreadyExists"));
+        setIsLoading(false);
+        return;
+      }
+    } catch {
+      // Check failed — let the auth flow decide (it may error on its own).
+    }
+
     try {
       await signIn("password", {
         flow: "signUp",
@@ -159,6 +180,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (/already/i.test(message)) {
+        setSuggestSignIn(true);
         setError(t("auth.alreadyExists"));
       } else {
         fail(err, "Could not create your account.");
@@ -489,9 +511,22 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </div>
                   )}
                   {error && (
-                    <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                      {error}
-                    </p>
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                      <p className="text-sm text-destructive">{error}</p>
+                      {suggestSignIn && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSuggestSignIn(false);
+                            setError(null);
+                            setStep({ mode: "signIn" });
+                          }}
+                          className="mt-1 text-xs font-semibold text-destructive underline underline-offset-2 transition-colors hover:text-foreground"
+                        >
+                          {t("auth.signInInstead")}
+                        </button>
+                      )}
+                    </div>
                   )}
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
@@ -510,7 +545,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
               </CardContent>
               <CardFooter className="justify-center border-t pt-4">
                 <p className="text-sm text-muted-foreground">
-                  {step.mode === "signIn" ? t("auth.newHere") : t("auth.haveAccount")}{" "}
+                  {step.mode === "signIn"
+                    ? t("auth.newHere", { site: siteName })
+                    : t("auth.haveAccount")}{" "}
                   <button
                     type="button"
                     onClick={() => {
