@@ -113,7 +113,7 @@ export default function AdminSmtp() {
     <div className="space-y-6">
       <PageHeader
         title="SMTP & email"
-        description="Outbound mail configuration. Credentials stay server-side — only administrators see this."
+        description="Outbound mail configuration. Credentials stay server-side — only administrators see this. Once enabled, sign-in verification codes and password resets are also delivered through your own SMTP relay."
       />
 
       <div className="mx-auto max-w-xl space-y-6">
@@ -231,8 +231,9 @@ export default function AdminSmtp() {
           <CardHeader>
             <CardTitle className="text-base">Send test email</CardTitle>
             <CardDescription>
-              Verifies delivery through the configured provider. Without an
-              email provider the message is recorded in the mail log instead.
+              Verifies delivery through the SMTP relay configured above. If SMTP
+              is not configured or enabled yet, the message is recorded in the
+              mail log instead.
             </CardDescription>
           </CardHeader>
           <CardContent>

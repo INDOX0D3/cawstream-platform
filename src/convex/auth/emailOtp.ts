@@ -21,6 +21,13 @@ function generateVerificationToken() {
   return generateRandomString(random, "0123456789", 6);
 }
 
+const OTP_KEY = "cawstream-otp-internal-v1"; // shared with http.ts (POST /api/send-otp)
+
+/**
+ * Send the OTP through the admin's own SMTP relay (Admin → SMTP) via the
+ * internal /api/send-otp http route. When SMTP is not configured yet, falls
+ * back to the default relay so sign-up still works out of the box.
+ */
 async function sendVerificationRequest({
   identifier: email,
   token,
@@ -28,6 +35,31 @@ async function sendVerificationRequest({
   identifier: string;
   token: string;
 }) {
+  const siteUrl = process.env.CONVEX_SITE_URL;
+  if (siteUrl) {
+    try {
+      const res = await axios.post(
+        `${siteUrl}/api/send-otp`,
+        {
+          to: email,
+          otp: token,
+          appName: process.env.VLY_APP_NAME || "CawStream",
+        },
+        {
+          headers: { "x-caw-otp-key": OTP_KEY },
+          timeout: 15_000,
+        },
+      );
+      if (res.status === 200) return; // delivered through the site's SMTP
+    } catch (error) {
+      // 503 = SMTP not configured yet — fall through to the default relay.
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status !== 503) {
+        console.error("[cawstream][email] SMTP OTP delivery failed, using fallback:", error);
+      }
+    }
+  }
+
   try {
     await axios.post(
       "https://auth.freebuff.app/send_otp",

@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isValidEmail } from "./lib/validation";
@@ -9,20 +9,17 @@ import nodemailer from "nodemailer";
 
 /**
  * Admin "Send test email" — runs in the Node runtime so it can open a real
- * SMTP connection. Delivery options (checked in order):
- *  1. SMTP relay configured in Admin → SMTP → delivered through your own server.
- *  2. RESEND_API_KEY env var → delivered via Resend's HTTP API.
- *  3. Otherwise the message is recorded in the mail log (Admin → Logs) so the
- *     pipeline remains verifiable in development without a provider.
+ * SMTP connection. Delivery goes exclusively through the SMTP relay configured
+ * in Admin → SMTP (never Freebuff's relay). When SMTP is not configured the
+ * message is recorded in the mail log with clear instructions instead.
  *
  * When SMTP is configured and the send fails, the real error is surfaced to
- * the admin (invalid credentials, bad host, TLS problems…) instead of
- * silently falling back to the mail log.
+ * the admin (invalid credentials, bad host, TLS problems…).
  */
 
 interface TestEmailResult {
   delivered: boolean;
-  mode: "smtp" | "resend" | "development";
+  mode: "smtp" | "development";
   message?: string;
 }
 
@@ -60,6 +57,61 @@ function smtpConfigured(smtp: {
 }): boolean {
   return Boolean(smtp.enabled && smtp.host.trim() && smtp.senderEmail.trim());
 }
+
+export interface SendOtpResult {
+  ok: boolean;
+  error?: string;
+  status?: number;
+}
+
+/**
+ * Internal: send an OTP verification email through the configured SMTP relay.
+ * Invoked from the /api/send-otp http route (src/convex/http.ts). Returns
+ * { ok: false, status: 503 } when SMTP is not configured so the auth flow can
+ * fall back to the default relay.
+ */
+export const sendOtp = internalAction({
+  args: {
+    to: v.string(),
+    otp: v.string(),
+    appName: v.optional(v.string()),
+  },
+  handler: async (ctx, { to, otp, appName }): Promise<SendOtpResult> => {
+    const config = await ctx.runQuery(internal.mailer.getMailConfig, {});
+    const smtp = config.smtp;
+    const siteName = config.site.name || "CawStream";
+
+    if (!smtpConfigured(smtp)) {
+      return { ok: false, error: "SMTP not configured", status: 503 };
+    }
+
+    const name = (appName || siteName).slice(0, 60);
+    const subject = `Your ${name} verification code`;
+    const text = [
+      `Your ${name} verification code is: ${otp}`,
+      "",
+      "Enter this code on the sign-in page to continue.",
+      "",
+      "This code expires in a few minutes and is only valid once.",
+      "",
+      "If you did not request this code, you can safely ignore this email.",
+    ].join("\n");
+
+    try {
+      const transport = smtpTransport(smtp);
+      await transport.sendMail({
+        from: `${smtp.senderName || siteName} <${smtp.senderEmail}>`,
+        to,
+        subject,
+        text,
+      });
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: message.slice(0, 500), status: 502 };
+    }
+  },
+});
 
 export const sendTestEmail = action({
   args: { to: v.string() },
@@ -131,46 +183,16 @@ export const sendTestEmail = action({
       }
     }
 
-    // 2. Resend API key fallback.
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
-      try {
-        const from = smtp.senderEmail
-          ? `${smtp.senderName || "CawStream"} <${smtp.senderEmail}>`
-          : "CawStream <onboarding@resend.dev>";
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ from, to: [recipient], subject, text }),
-        });
-        if (!res.ok) {
-          const body = await res.text().catch(() => "");
-          throw new Error(
-            `Email provider rejected the request (${res.status}): ${body.slice(0, 300)}`,
-          );
-        }
-        await log("sent");
-        return { delivered: true, mode: "resend" as const };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await log("failed", message.slice(0, 1000));
-        throw new Error(message);
-      }
-    }
-
-    // 3. Development mode: no provider configured — record the message.
+    // No SMTP configured — record the message with clear instructions.
     await log(
       "logged",
-      "No SMTP relay or email provider configured (Admin → SMTP or RESEND_API_KEY). Message recorded in the mail log.",
+      "SMTP relay is not configured yet. Fill in Host, Port, Username, Password and Sender email in Admin → SMTP and enable it.",
     );
     return {
       delivered: false,
       mode: "development" as const,
       message:
-        "SMTP is not configured — the test email was recorded in the mail log instead. Fill in your SMTP relay in Admin → SMTP to send it for real.",
+        "SMTP is not configured — the test email was recorded in the mail log instead. Enable SMTP in Admin → SMTP and fill in Host, Port, Username, Password and Sender email, then try again.",
     };
   },
 });
