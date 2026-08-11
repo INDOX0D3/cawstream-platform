@@ -247,7 +247,7 @@ function VideoDetailDialog({
     [detail?.stats.daily],
   );
 
-  const maxViews = Math.max(1, ...daily.map((d) => d.count));
+  const maxViews = Math.max(1, ...daily.map((d: { date: string; count: number }) => d.count));
 
   return (
     <>
