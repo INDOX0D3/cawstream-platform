@@ -6,8 +6,9 @@ import { DEFAULT_SITE, DEFAULT_SMTP, type SiteSettings, type SmtpSettings } from
 
 /**
  * Mail log + internal helpers. The actual delivery (SMTP via nodemailer,
- * Resend fallback) lives in `./mailSmtp.ts` as a Node-runtime action —
- * Convex only allows actions in Node.js, so the query below stays here.
+ * Freebuff fallback) lives in `./mailSmtp.ts` as a Node-runtime action —
+ * Convex only allows actions in Node.js, so the queries/mutations below stay
+ * here.
  */
 
 /** Internal: append a row to the sentEmails mail log. */
@@ -44,6 +45,29 @@ export const getMailAuthUser = internalQuery({
       role: user.role ?? "user",
       status: user.status ?? "active",
     };
+  },
+});
+
+/** Internal: mark the SMTP relay verified (after a successful test send) or
+ * unverified (after a failed test send). The relay is only used for real mail
+ * when enabled AND verified. */
+export const setSmtpVerified = internalMutation({
+  args: { verified: v.boolean() },
+  handler: async (ctx, { verified }) => {
+    const smtp = (await getSetting(ctx, "smtp", DEFAULT_SMTP)) as SmtpSettings;
+    if (smtp.verified === verified) return;
+    const row = await ctx.db
+      .query("systemSettings")
+      .withIndex("by_key", (q) => q.eq("key", "smtp"))
+      .first();
+    if (!row) {
+      await ctx.db.insert("systemSettings", {
+        key: "smtp",
+        value: { ...DEFAULT_SMTP, ...smtp, verified },
+      });
+    } else {
+      await ctx.db.patch(row._id, { value: { ...row.value, verified } });
+    }
   },
 });
 

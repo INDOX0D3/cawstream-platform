@@ -38,6 +38,13 @@ export interface SmtpSettings {
   encryption: string; // none | tls | ssl
   senderName: string;
   senderEmail: string;
+  /**
+   * True only after a “Send test email” succeeds. The relay is used for real
+   * mail (OTP codes, resets) only when enabled AND verified; otherwise the
+   * default relay is used. Reset to false whenever the delivery config
+   * (host/port/encryption/username/sender/password) changes.
+   */
+  verified: boolean;
 }
 
 export interface SiteSettings {
@@ -87,6 +94,7 @@ export const DEFAULT_SMTP: SmtpSettings = {
   encryption: "tls",
   senderName: "CawStream",
   senderEmail: "",
+  verified: false,
 };
 
 export const DEFAULT_SITE: SiteSettings = {

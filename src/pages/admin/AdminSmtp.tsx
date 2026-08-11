@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/layout/Shell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ interface SmtpForm {
   senderName: string;
   senderEmail: string;
   passwordConfigured: boolean;
+  verified: boolean;
 }
 
 export default function AdminSmtp() {
@@ -62,6 +64,7 @@ export default function AdminSmtp() {
         senderName: settings.smtp.senderName,
         senderEmail: settings.smtp.senderEmail,
         passwordConfigured: settings.smtp.passwordConfigured,
+        verified: Boolean(settings.smtp.verified),
       });
     }
   }, [settings, form]);
@@ -109,14 +112,51 @@ export default function AdminSmtp() {
     }
   };
 
+  const status =
+    settings === undefined
+      ? "loading"
+      : settings.smtp.enabled
+        ? settings.smtp.verified
+          ? "active"
+          : "unverified"
+        : "disabled";
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="SMTP & email"
-        description="Outbound mail configuration. Credentials stay server-side — only administrators see this. Once enabled, sign-in verification codes and password resets are also delivered through your own SMTP relay."
+        description="Outbound mail configuration. Credentials stay server-side — only administrators see this."
       />
 
       <div className="mx-auto max-w-xl space-y-6">
+        {status === "disabled" && (
+          <Alert>
+            <AlertDescription>
+              SMTP relay is <strong>disabled</strong> — all emails (sign-in
+              verification codes, password resets) are sent through the default
+              Freebuff relay. Fill in the fields below, enable SMTP, then send a
+              test email to switch delivery to your own server.
+            </AlertDescription>
+          </Alert>
+        )}
+        {status === "unverified" && (
+          <Alert>
+            <AlertDescription>
+              SMTP relay is <strong>enabled but not verified yet</strong> — emails
+              still go through the default relay until a test email is sent
+              successfully. Send a test email below to verify and activate this
+              relay.
+            </AlertDescription>
+          </Alert>
+        )}
+        {status === "active" && (
+          <Alert>
+            <AlertDescription>
+              SMTP relay is <strong>active and verified</strong> — all emails are
+              now sent through your own SMTP server ({settings?.smtp.host}).
+            </AlertDescription>
+          </Alert>
+        )}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -133,7 +173,8 @@ export default function AdminSmtp() {
               <div>
                 <p className="text-sm font-semibold">Enable SMTP</p>
                 <p className="text-xs text-muted-foreground">
-                  Used for verification emails and password resets.
+                  All mail is sent through this relay only after a test email
+                  succeeds; otherwise the default relay is used.
                 </p>
               </div>
               <Switch checked={form.enabled} onCheckedChange={(v) => set("enabled", v)} />
@@ -231,9 +272,10 @@ export default function AdminSmtp() {
           <CardHeader>
             <CardTitle className="text-base">Send test email</CardTitle>
             <CardDescription>
-              Verifies delivery through the SMTP relay configured above. If SMTP
-              is not configured or enabled yet, the message is recorded in the
-              mail log instead.
+              A successful test marks the relay as verified — real mail
+              (verification codes, password resets) only switches to your SMTP
+              after that. If no relay is configured, the message is recorded in
+              the mail log instead.
             </CardDescription>
           </CardHeader>
           <CardContent>

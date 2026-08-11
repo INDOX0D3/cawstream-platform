@@ -179,7 +179,22 @@ export const updateSettings = mutation({
         username: String(value.username ?? base.username ?? "").slice(0, 255),
         senderName: String(value.senderName ?? base.senderName ?? "").slice(0, 120),
         senderEmail: String(value.senderEmail ?? base.senderEmail ?? "").slice(0, 255),
+        // Only the server sets this — via mailer.setSmtpVerified after a
+        // successful test email. Never accept it from the client.
+        verified: base.verified,
       };
+      // A successful test email is the only thing that sets verified=true (see
+      // mailer.setSmtpVerified). Any change to the delivery config invalidates
+      // the previous verification — never trust a verified flag from the client.
+      const passwordChanged = password !== base.password;
+      const deliveryChanged =
+        passwordChanged ||
+        next.host !== base.host ||
+        next.port !== base.port ||
+        next.encryption !== base.encryption ||
+        next.username !== base.username ||
+        next.senderEmail !== base.senderEmail;
+      if (deliveryChanged) next.verified = false;
       await setSetting(ctx, "smtp", next);
       return { ...next, password: maskSecret(next.password), passwordConfigured: Boolean(next.password) };
     }

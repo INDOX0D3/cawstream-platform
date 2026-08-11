@@ -8,19 +8,22 @@ import { isValidEmail } from "./lib/validation";
 import nodemailer from "nodemailer";
 
 /**
- * Admin "Send test email" — runs in the Node runtime so it can open a real
- * SMTP connection. Delivery goes exclusively through the SMTP relay configured
- * in Admin → SMTP (never Freebuff's relay). When SMTP is not configured the
- * message is recorded in the mail log with clear instructions instead.
- *
- * When SMTP is configured and the send fails, the real error is surfaced to
- * the admin (invalid credentials, bad host, TLS problems…).
+ * SMTP delivery runs in the Node runtime (nodemailer). The relay configured in
+ * Admin → SMTP is used for real mail (OTP codes, resets, test emails) only
+ * when it is enabled AND a test email has succeeded (verified). Until then the
+ * default Freebuff relay is used, so sign-ups never break.
  */
 
 interface TestEmailResult {
   delivered: boolean;
   mode: "smtp" | "development";
   message?: string;
+}
+
+export interface SendOtpResult {
+  ok: boolean;
+  error?: string;
+  status?: number;
 }
 
 /** Build a nodemailer transporter from the stored SMTP settings. */
@@ -49,26 +52,26 @@ function smtpTransport(smtp: {
   });
 }
 
-/** True when the admin has configured a usable SMTP relay. */
-function smtpConfigured(smtp: {
+/** Delivery fields (host + sender) are filled in — a send attempt is possible. */
+function smtpFieldsFilled(smtp: { host: string; senderEmail: string }): boolean {
+  return Boolean(smtp.host.trim() && smtp.senderEmail.trim());
+}
+
+/** The relay is usable for real mail: enabled, filled in AND verified by a test. */
+function smtpUsable(smtp: {
   enabled: boolean;
+  verified?: boolean;
   host: string;
   senderEmail: string;
 }): boolean {
-  return Boolean(smtp.enabled && smtp.host.trim() && smtp.senderEmail.trim());
-}
-
-export interface SendOtpResult {
-  ok: boolean;
-  error?: string;
-  status?: number;
+  return Boolean(smtp.enabled && smtp.verified && smtpFieldsFilled(smtp));
 }
 
 /**
- * Internal: send an OTP verification email through the configured SMTP relay.
- * Invoked from the /api/send-otp http route (src/convex/http.ts). Returns
- * { ok: false, status: 503 } when SMTP is not configured so the auth flow can
- * fall back to the default relay.
+ * Internal: send an OTP verification email. Invoked from the /api/send-otp
+ * http route (src/convex/http.ts). Returns { ok: false, status: 503 } when the
+ * admin SMTP is not enabled/verified, so the auth flow automatically falls
+ * back to the default Freebuff relay.
  */
 export const sendOtp = internalAction({
   args: {
@@ -81,8 +84,8 @@ export const sendOtp = internalAction({
     const smtp = config.smtp;
     const siteName = config.site.name || "CawStream";
 
-    if (!smtpConfigured(smtp)) {
-      return { ok: false, error: "SMTP not configured", status: 503 };
+    if (!smtpUsable(smtp)) {
+      return { ok: false, error: "SMTP not configured or not verified", status: 503 };
     }
 
     const name = (appName || siteName).slice(0, 60);
@@ -113,6 +116,12 @@ export const sendOtp = internalAction({
   },
 });
 
+/**
+ * Admin "Send test email" — runs in the Node runtime so it can open a real
+ * SMTP connection. A successful send marks the relay as verified (and real
+ * mail then flows through it once enabled); a failed send clears verification
+ * and surfaces the real error.
+ */
 export const sendTestEmail = action({
   args: { to: v.string() },
   handler: async (ctx, { to }): Promise<TestEmailResult> => {
@@ -145,7 +154,7 @@ export const sendTestEmail = action({
       "Delivery configuration:",
       `  - SMTP: ${smtp.host ? `${smtp.host}:${smtp.port} (${smtp.encryption})` : "not configured"}`,
       `  - Sender: ${smtp.senderName || "—"} <${smtp.senderEmail || "not set"}>`,
-      `  - Resend API key: ${process.env.RESEND_API_KEY ? "configured" : "not configured"}`,
+      `  - Verified: ${smtp.verified ? "yes" : "no (run a successful test to verify)"}`,
       "",
       "If you received this, email delivery is working.",
     ].join("\n");
@@ -160,8 +169,9 @@ export const sendTestEmail = action({
       });
     };
 
-    // 1. The user's own SMTP relay.
-    if (smtpConfigured(smtp)) {
+    // The admin's own SMTP relay (works even while disabled, so the admin can
+    // verify the config first and only then flip the switch on).
+    if (smtpFieldsFilled(smtp)) {
       try {
         const transport = smtpTransport(smtp);
         await transport.sendMail({
@@ -170,20 +180,23 @@ export const sendTestEmail = action({
           subject,
           text,
         });
+        await ctx.runMutation(internal.mailer.setSmtpVerified, { verified: true });
         await log("sent");
         return {
           delivered: true,
           mode: "smtp" as const,
-          message: `Delivered via ${smtp.host}:${smtp.port}.`,
+          message: `Delivered via ${smtp.host}:${smtp.port}. The relay is now verified and will be used for all mail.`,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        await ctx.runMutation(internal.mailer.setSmtpVerified, { verified: false });
         await log("failed", message.slice(0, 1000));
         throw new Error(`SMTP delivery failed (${smtp.host}:${smtp.port}): ${message}`);
       }
     }
 
-    // No SMTP configured — record the message with clear instructions.
+    // No relay configured — record the message with clear instructions.
+    await ctx.runMutation(internal.mailer.setSmtpVerified, { verified: false });
     await log(
       "logged",
       "SMTP relay is not configured yet. Fill in Host, Port, Username, Password and Sender email in Admin → SMTP and enable it.",
@@ -192,7 +205,7 @@ export const sendTestEmail = action({
       delivered: false,
       mode: "development" as const,
       message:
-        "SMTP is not configured — the test email was recorded in the mail log instead. Enable SMTP in Admin → SMTP and fill in Host, Port, Username, Password and Sender email, then try again.",
+        "SMTP is not configured — the test email was recorded in the mail log instead. Fill in Host, Port, Username, Password and Sender email, then try again.",
     };
   },
 });
