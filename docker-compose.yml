@@ -1,0 +1,15 @@
+# CawStream — one-command run: `docker compose up -d --build`
+#
+# Before starting, create `.env` in this directory with at least:
+#   VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
+# (see deploy/env.example for the full list)
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL:?Set VITE_CONVEX_URL in .env}
+    image: cawstream
+    restart: unless-stopped
+    ports:
+      - "80:80"

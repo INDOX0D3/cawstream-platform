@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/get-convex/convex/main/npm-packages/convex/schemas/json/convex.schema.json",
+  "project": "your-convex-project-slug",
+  "team": "your-convex-team-slug",
+  "deployment": "your-project-123",
+  "functions": "src/convex"
+}
