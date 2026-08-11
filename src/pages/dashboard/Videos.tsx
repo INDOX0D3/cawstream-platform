@@ -55,6 +55,7 @@ import {
 } from "recharts";
 
 type VideoRow = NonNullable<ReturnType<typeof useQuery<typeof api.videos.listMine>>>[number];
+type VideoDetail = NonNullable<ReturnType<typeof useQuery<typeof api.videos.getMine>>>;
 
 const FILTERS = ["all", "ready", "processing", "failed"] as const;
 
@@ -142,7 +143,9 @@ function VideoDetailDialog({
 }) {
   const { t } = useI18n();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const detail = useQuery(api.videos.getMine, { videoId: video._id });
+  const detail: VideoDetail | undefined = useQuery(api.videos.getMine, {
+    videoId: video._id,
+  });
   const updateVideo = useMutation(api.videos.updateVideo);
   const deleteVideo = useMutation(api.videos.deleteVideo);
   const reprocess = useMutation(api.videos.reprocess);
@@ -247,7 +250,7 @@ function VideoDetailDialog({
     [detail?.stats.daily],
   );
 
-  const maxViews = Math.max(1, ...daily.map((d) => d.count));
+  const maxViews = Math.max(1, ...daily.map((d: { date: string; count: number }) => d.count));
 
   return (
     <>
