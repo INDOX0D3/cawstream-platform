@@ -235,7 +235,7 @@ function VideoDetailDialog({
     }
   };
 
-  const daily = useMemo(
+  const daily = useMemo<Array<{ date: string; count: number; label: string }>>(
     () =>
       (detail?.stats.daily ?? []).map((d: { date: string; count: number }) => ({
         ...d,
