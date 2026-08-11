@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cloakPreviewUrl, videoUrls } from "@/lib/embed";
+import { videoUrls } from "@/lib/embed";
 import { formatCompact, formatDuration, formatRelative } from "@/lib/format";
 import { useI18n, type DictKey } from "@/lib/i18n";
 import { Eye, ImageIcon, Link2, Pencil, Play } from "lucide-react";
@@ -35,7 +35,7 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
       icon: <Play className="size-3.5" />,
       labelKey: "card.embedLink" as DictKey,
       hintKey: "card.embedHint" as DictKey,
-      value: cloakPreviewUrl(publicId, "e"),
+      value: urls.embed,
     },
     {
       icon: <ImageIcon className="size-3.5" />,

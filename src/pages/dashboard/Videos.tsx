@@ -25,7 +25,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/convex/_generated/api";
-import { cloakPreviewUrl, embedCode, videoUrls } from "@/lib/embed";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
@@ -157,7 +157,7 @@ function VideoDetailDialog({
   const [autoFullEmbed, setAutoFullEmbed] = useState(true); // embeds are fullscreen by default
 
   const urls = videoUrls(video.publicId);
-  const watchShare = cloakPreviewUrl(video.publicId, "v");
+  const watchShare = urls.watch;
   const embed = embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed });
 
   const save = async () => {

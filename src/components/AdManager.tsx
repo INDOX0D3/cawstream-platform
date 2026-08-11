@@ -5,16 +5,20 @@
  * server from VIDEO → OWNER → USER AD SETTINGS (see src/convex/ads.ts). This
  * component only *renders* them inside the public player/embed context.
  *
- * Isolation rules:
- *  - Social Bar code runs inside a sandboxed iframe (sandbox="allow-scripts")
- *    so it can never touch the app DOM, cookies or session.
- *  - Popunder code runs in a fresh popup window whose `opener` is detached
- *    immediately, never inside the app.
+ * Behavior:
+ *  - Smartlink opens in a new tab the first time the viewer clicks the player,
+ *    on every screen (watch page and embed), at most once per browsing session
+ *    (sessionStorage — so it never nags the same visitor on every video).
+ *  - Social Bar is a banner shown continuously above the player while enabled.
+ *    Its code runs inside a sandboxed iframe (sandbox="allow-scripts") so it
+ *    can never touch the app DOM, cookies or session.
+ *  - Popunder opens once per session on the first interaction with the player,
+ *    in a fresh popup window whose `opener` is detached immediately, never
+ *    inside the app.
  *  - Smartlink is a plain https:// link opened with noopener.
  *  - Nothing here is ever rendered on dashboard, admin or auth pages.
  */
-import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export interface AdsConfig {
@@ -43,6 +47,35 @@ export function isValidSmartlink(url: string): boolean {
     return false;
   }
 }
+
+function hashCode(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/** sessionStorage helpers — "once per session" guarantees. */
+function sessionFired(key: string): boolean {
+  try {
+    return window.sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markSessionFired(key: string): void {
+  try {
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    /* private mode — fall back to firing once per page load */
+  }
+}
+
+const smartlinkKey = (url: string) => `cawstream:ad:smartlink:${url}`;
+const popunderKey = (code: string) => `cawstream:ad:popunder:${hashCode(code)}`;
 
 /** Build a self-contained sandbox document for a social-bar ad code. */
 function buildSocialBarDoc(code: string): string {
@@ -94,48 +127,50 @@ function openPopunder(code: string): void {
 
 export function AdManager({
   ads,
-  playing,
   containerRef,
   className,
 }: {
   ads: AdsConfig;
-  playing: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
 }) {
-  const fired = useRef({ smartlink: false, popunder: false });
-  const [socialDismissed, setSocialDismissed] = useState(false);
+  const firedRef = useRef(false);
 
-  // Smartlink — fire once when playback actually starts.
+  // Smartlink + popunder — fire on the first click inside the player, each at
+  // most once per browsing session.
   useEffect(() => {
-    if (
-      playing &&
-      !fired.current.smartlink &&
-      ads.smartlinkEnabled &&
-      isValidSmartlink(ads.smartlinkUrl)
-    ) {
-      fired.current.smartlink = true;
-      window.open(ads.smartlinkUrl, "_blank", "noopener");
-    }
-  }, [playing, ads.smartlinkEnabled, ads.smartlinkUrl]);
+    const smartlinkOn =
+      ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
+    const popunderOn = ads.popunderEnabled && ads.popunderCode;
+    if (!smartlinkOn && !popunderOn) return;
 
-  // Popunder — fire once on the first user gesture inside the player.
-  useEffect(() => {
-    if (!ads.popunderEnabled || !ads.popunderCode) return;
     const el = containerRef.current;
     if (!el) return;
+
     const handler = () => {
-      if (!fired.current.popunder) {
-        fired.current.popunder = true;
+      if (firedRef.current) return; // guard against re-entrancy in one mount
+      firedRef.current = true;
+      if (smartlinkOn && !sessionFired(smartlinkKey(ads.smartlinkUrl))) {
+        markSessionFired(smartlinkKey(ads.smartlinkUrl));
+        window.open(ads.smartlinkUrl, "_blank", "noopener");
+      }
+      if (popunderOn && !sessionFired(popunderKey(ads.popunderCode))) {
+        markSessionFired(popunderKey(ads.popunderCode));
         openPopunder(ads.popunderCode);
       }
     };
-    el.addEventListener("pointerdown", handler, { once: true });
-    return () => el.removeEventListener("pointerdown", handler);
-  }, [ads.popunderEnabled, ads.popunderCode, containerRef]);
 
-  const socialVisible =
-    ads.socialBarEnabled && ads.socialBarCode && !socialDismissed;
+    el.addEventListener("pointerdown", handler);
+    return () => el.removeEventListener("pointerdown", handler);
+  }, [
+    ads.smartlinkEnabled,
+    ads.smartlinkUrl,
+    ads.popunderEnabled,
+    ads.popunderCode,
+    containerRef,
+  ]);
+
+  const socialVisible = ads.socialBarEnabled && ads.socialBarCode;
 
   if (!socialVisible) return null;
 
@@ -148,14 +183,6 @@ export function AdManager({
           srcDoc={buildSocialBarDoc(ads.socialBarCode)}
           className="h-full w-full border-0"
         />
-        <button
-          type="button"
-          aria-label="Close advertisement"
-          onClick={() => setSocialDismissed(true)}
-          className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white/80 transition-colors hover:bg-black hover:text-white"
-        >
-          <X className="size-3.5" />
-        </button>
       </div>
     </div>
   );

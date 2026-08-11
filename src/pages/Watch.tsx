@@ -2,25 +2,23 @@ import { CopyButton } from "@/components/CopyButton";
 import { VideoCard } from "@/components/VideoCard";
 import { Logo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { cloakPreviewUrl, embedCode } from "@/lib/embed";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { formatCompact, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { applyVideoMeta } from "@/lib/seo";
 import { useQuery } from "convex/react";
 import { motion } from "framer-motion";
 import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, Sparkles, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
   const { t } = useI18n();
-  const [autoFullEmbed, setAutoFullEmbed] = useState(true); // embeds are fullscreen by default
   const payload = useQuery(api.videos.getWatch, { publicId });
   const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(
@@ -107,6 +105,7 @@ export default function Watch() {
           branding={branding}
           player={player}
           userPrefs={userPrefs}
+          showFullscreen={false}
         />
 
         <div className="mt-6 space-y-5">
@@ -137,19 +136,8 @@ export default function Watch() {
               <Link2 className="mr-2 size-4" />
               {t("watch.share")}
             </Button>
-            <label className="flex h-8 items-center gap-2 rounded-lg border px-2.5 text-xs text-muted-foreground">
-              <Switch
-                checked={autoFullEmbed}
-                onCheckedChange={setAutoFullEmbed}
-                className="scale-90"
-              />
-              {t("watch.fullscreen")}
-            </label>
-            <CopyButton
-              value={embedCode(video.publicId, 500, { autoFullscreen: autoFullEmbed })}
-              label={t("watch.embed")}
-            />
-            <CopyButton value={cloakPreviewUrl(video.publicId, "v")} label={t("watch.copyLink")} />
+            <CopyButton value={embedCode(video.publicId, 500)} label={t("watch.embed")} />
+            <CopyButton value={videoUrls(video.publicId).watch} label={t("watch.copyLink")} />
           </div>
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -172,7 +160,7 @@ export default function Watch() {
             className="mt-10"
           >
             <h2 className="text-lg font-semibold tracking-tight">
-              {t("watch.moreFrom", { user: owner.username })}
+              {t("watch.moreFrom", { user: owner.name })}
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {related.map((item) => (

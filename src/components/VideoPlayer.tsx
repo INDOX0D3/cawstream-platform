@@ -4,8 +4,9 @@
  * Fully custom player skin — the browser's native controls are never shown:
  *  - Big accent-colored play button (color chosen in Admin → Player settings)
  *  - Custom control bar: play/pause, buffered seek bar, time, picture-in-picture,
- *    share, settings and fullscreen — auto-hides while playing
- *  - Keyboard shortcuts (space/k play, ←/→ seek, f fullscreen)
+ *    share and settings — auto-hides while playing (fullscreen button is only
+ *    shown on the embed surface, not the watch page)
+ *  - Keyboard shortcuts (space/k play, ←/→ seek, f fullscreen on embeds)
  *  - Share menu: copy link, copy embed code, native device share
  *  - Settings menu: playback speed and HLS quality ladder
  *
@@ -53,7 +54,7 @@ import { toast } from "sonner";
 import { formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { getVisitorId, viewProof } from "@/lib/visitor";
-import { cloakPreviewUrl, embedCode, videoUrls } from "@/lib/embed";
+import { embedCode, videoUrls } from "@/lib/embed";
 import { cn } from "@/lib/utils";
 
 /**
@@ -148,6 +149,7 @@ export function VideoPlayer({
   className,
   autoFullscreen = false,
   fill = false,
+  showFullscreen = true,
 }: {
   video: PlayerVideo;
   ads: AdsConfig;
@@ -158,6 +160,8 @@ export function VideoPlayer({
   autoFullscreen?: boolean;
   /** Fill the whole container (viewport) edge-to-edge instead of a fixed aspect box. */
   fill?: boolean;
+  /** Show the fullscreen button (and f/double-click shortcuts). Off on the watch page. */
+  showFullscreen?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -485,7 +489,7 @@ export function VideoPlayer({
           break;
         case "f":
         case "F":
-          toggleFullscreen();
+          if (showFullscreen) toggleFullscreen();
           break;
       }
     };
@@ -560,7 +564,7 @@ export function VideoPlayer({
         className,
       )}
     >
-      <AdManager ads={ads} playing={playing} containerRef={containerRef} />
+      <AdManager ads={ads} containerRef={containerRef} />
 
       {/* Watermark */}
       {showWatermark && (
@@ -594,7 +598,7 @@ export function VideoPlayer({
         preload={autoplay ? "auto" : "metadata"}
         disablePictureInPicture={!player.pictureInPicture}
         onClick={handleVideoClick}
-        onDoubleClick={() => void toggleFullscreen()}
+        onDoubleClick={showFullscreen ? () => void toggleFullscreen() : undefined}
         onPlaying={handlePlaying}
         onWaiting={() => setBuffering(true)}
         onCanPlay={() => setBuffering(false)}
@@ -685,8 +689,7 @@ export function VideoPlayer({
               type="button"
               aria-label={playing ? t("player.pause") : t("player.playLabel")}
               onClick={togglePlay}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95"
-              style={{ background: accent.color, color: accent.foreground }}
+              className={cn(ICON_BTN, "shadow-lg")}
             >
               {playing ? (
                 <Pause className="size-4" fill="currentColor" />
@@ -723,7 +726,7 @@ export function VideoPlayer({
                   <DropdownMenuContent side="top" align="end" className="w-60">
                     <DropdownMenuItem
                       onClick={() =>
-                        copyToClipboard(cloakPreviewUrl(video.publicId, "v"), t("player.linkCopied"))
+                        copyToClipboard(videoUrls(video.publicId).watch, t("player.linkCopied"))
                       }
                     >
                       <Link2 className="mr-2 size-4" />
@@ -741,7 +744,7 @@ export function VideoPlayer({
                         <DropdownMenuItem
                           onClick={() => {
                             void navigator
-                              .share({ title: video.title, url: cloakPreviewUrl(video.publicId, "v") })
+                              .share({ title: video.title, url: videoUrls(video.publicId).watch })
                               .catch(() => undefined);
                           }}
                         >
@@ -812,14 +815,16 @@ export function VideoPlayer({
                 </DropdownMenuPortal>
               </DropdownMenu>
 
-              <button
-                type="button"
-                aria-label={isFullscreen ? t("player.exitFullscreen") : t("player.fullscreen")}
-                onClick={toggleFullscreen}
-                className={ICON_BTN}
-              >
-                {isFullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
-              </button>
+              {showFullscreen && (
+                <button
+                  type="button"
+                  aria-label={isFullscreen ? t("player.exitFullscreen") : t("player.fullscreen")}
+                  onClick={toggleFullscreen}
+                  className={ICON_BTN}
+                >
+                  {isFullscreen ? <Minimize className="size-4" /> : <Maximize className="size-4" />}
+                </button>
+              )}
             </div>
           </div>
         </div>
