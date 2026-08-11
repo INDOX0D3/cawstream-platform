@@ -45,8 +45,8 @@ export function UpgradeDialog({
           compact
         />
         <p className="text-center text-xs text-muted-foreground">
-          {t("pricing.whatsapp")} · wa.me/{""}
-          <span className="font-medium">6288272222789</span>
+          {t("pricing.telegram")} · t.me/{""}
+          <span className="font-medium">cawsociety</span>
         </p>
       </DialogContent>
     </Dialog>

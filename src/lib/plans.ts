@@ -3,11 +3,13 @@
  *
  * Free accounts are capped at 500 MB of uploads (enforced server-side in
  * src/convex/videos.ts). Premium/Platinum are activated manually by an
- * administrator (Admin → Users → Plan) after the subscriber pays via WhatsApp.
+ * administrator (Admin → Users → Plan) after the subscriber pays — contact
+ * via Telegram (t.me/cawsociety).
  */
 export const FREE_LIMIT_BYTES = 500 * 1024 * 1024; // 500 MB
 
-export const WHATSAPP_NUMBER = "6288272222789";
+export const TELEGRAM_USERNAME = "cawsociety";
+export const TELEGRAM_LINK = `https://t.me/${TELEGRAM_USERNAME}`;
 
 export type PlanId = "free" | "premium" | "platinum";
 
@@ -42,8 +44,12 @@ export function formatPriceIdr(plan: PlanId): string {
   return price === null ? "Gratis" : PRICE_FORMAT.format(price);
 }
 
-/** Build the wa.me deep link with a prefilled message for a plan. */
-export function waSubscribeLink(plan: PlanId, extra?: string, site?: string): string {
+/** Build the Telegram deep link with a prefilled message for a plan. */
+export function telegramSubscribeLink(
+  plan: PlanId,
+  extra?: string,
+  site?: string,
+): string {
   const text = [
     `Halo, saya ingin berlangganan ${site || "CawStream"} ${PLAN_LABEL[plan]}`,
     PLANS[plan].priceIdr
@@ -52,5 +58,5 @@ export function waSubscribeLink(plan: PlanId, extra?: string, site?: string): st
     "Mohon info cara pembayarannya.",
     extra ? ` ${extra}` : "",
   ].join(" ");
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+  return `https://t.me/${TELEGRAM_USERNAME}?text=${encodeURIComponent(text)}`;
 }

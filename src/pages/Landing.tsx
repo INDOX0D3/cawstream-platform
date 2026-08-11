@@ -428,7 +428,7 @@ export default function Landing() {
             />
           </div>
           <p className="mt-6 text-center text-xs text-white/40">
-            {t("pricing.whatsapp")} · wa.me/6288272222789
+            {t("pricing.telegram")} · t.me/cawsociety
           </p>
         </div>
       </section>

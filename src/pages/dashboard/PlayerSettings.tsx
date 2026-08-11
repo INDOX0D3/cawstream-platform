@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { waSubscribeLink } from "@/lib/plans";
+import { telegramSubscribeLink } from "@/lib/plans";
 import { uploadBlob } from "@/lib/video";
 import { useI18n } from "@/lib/i18n";
 import { useMutation, useQuery } from "convex/react";
@@ -425,7 +425,7 @@ export default function PlayerSettings() {
               </p>
               <Button className="mt-4" asChild>
                 <a
-                  href={waSubscribeLink("premium", undefined, siteName)}
+                  href={telegramSubscribeLink("premium", undefined, siteName)}
                   target="_blank"
                   rel="noreferrer"
                 >

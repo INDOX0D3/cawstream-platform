@@ -1,13 +1,13 @@
 /**
  * Pricing card grid — used on the landing page, the signup plan step, and the
  * upgrade dialog. Copy comes from the i18n dictionary (ID for Indonesian
- * users, EN otherwise). Premium/Platinum buttons deep-link to WhatsApp.
+ * users, EN otherwise). Premium/Platinum buttons deep-link to Telegram.
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { useI18n, type DictKey } from "@/lib/i18n";
-import { PLAN_IDS, waSubscribeLink, type PlanId } from "@/lib/plans";
+import { PLAN_IDS, telegramSubscribeLink, type PlanId } from "@/lib/plans";
 import { useQuery } from "convex/react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,12 +46,14 @@ const FEATURE_KEYS: Record<PlanId, DictKey[]> = {
     "pricing.premium.feat1",
     "pricing.premium.feat2",
     "pricing.premium.feat3",
+    "pricing.premium.feat4",
   ],
   platinum: [
     "pricing.platinum.feat1",
     "pricing.platinum.feat2",
     "pricing.platinum.feat3",
     "pricing.platinum.feat4",
+    "pricing.platinum.feat5",
   ],
 };
 
@@ -126,7 +128,7 @@ export function PricingCards({
                 </Button>
               ) : (
                 <a
-                  href={waSubscribeLink(planId, undefined, siteName)}
+                  href={telegramSubscribeLink(planId, undefined, siteName)}
                   target="_blank"
                   rel="noreferrer"
                   className="block"
