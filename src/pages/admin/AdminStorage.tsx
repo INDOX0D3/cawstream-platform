@@ -6,6 +6,10 @@ import { useQuery } from "convex/react";
 import { HardDrive, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type StorageRow = NonNullable<
+  ReturnType<typeof useQuery<typeof api.admin.storageBreakdown>>
+>["perUser"][number];
+
 export default function AdminStorage() {
   const data = useQuery(api.admin.storageBreakdown);
 
@@ -17,7 +21,7 @@ export default function AdminStorage() {
     );
   }
 
-  const maxBytes = Math.max(1, ...data.perUser.map((row) => row.bytes));
+  const maxBytes = Math.max(1, ...data.perUser.map((row: StorageRow) => row.bytes));
 
   return (
     <div className="space-y-6">
@@ -40,7 +44,7 @@ export default function AdminStorage() {
           </div>
         ) : (
           <div className="divide-y">
-            {data.perUser.map((row) => {
+            {data.perUser.map((row: StorageRow) => {
               const percent = Math.max(0.5, (row.bytes / maxBytes) * 100);
               return (
                 <div key={row.userId} className="flex items-center gap-4 px-4 py-3">

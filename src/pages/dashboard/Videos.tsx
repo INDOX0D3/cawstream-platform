@@ -64,7 +64,7 @@ export default function Videos() {
   const [selected, setSelected] = useState<VideoRow | null>(null);
   const videos = useQuery(api.videos.listMine, { status: filter === "all" ? undefined : filter });
 
-  const filtered = videos?.filter((v) =>
+  const filtered = videos?.filter((v: VideoRow) =>
     filter === "all"
       ? true
       : filter === "processing"
@@ -93,7 +93,7 @@ export default function Videos() {
         </div>
       ) : filtered && filtered.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((video) => (
+          {filtered.map((video: VideoRow) => (
             <VideoCard
               key={video._id}
               video={video as VideoCardVideo}
@@ -237,7 +237,7 @@ function VideoDetailDialog({
 
   const daily = useMemo(
     () =>
-      (detail?.stats.daily ?? []).map((d) => ({
+      (detail?.stats.daily ?? []).map((d: { date: string; count: number }) => ({
         ...d,
         label: new Date(`${d.date}T00:00:00`).toLocaleDateString(undefined, {
           month: "short",

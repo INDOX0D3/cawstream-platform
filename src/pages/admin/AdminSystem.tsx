@@ -18,6 +18,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+type FailedJob = NonNullable<
+  ReturnType<typeof useQuery<typeof api.jobs.listFailedJobs>>
+>[number];
+
 export default function AdminSystem() {
   const status = useQuery(api.admin.systemStatus);
   const failedJobs = useQuery(api.jobs.listFailedJobs);
@@ -156,7 +160,7 @@ export default function AdminSystem() {
                   </TableCell>
                 </TableRow>
               ) : (
-                failedJobs.map((job) => (
+                failedJobs.map((job: FailedJob) => (
                   <TableRow key={job.jobId}>
                     <TableCell className="text-sm">
                       {job.video ? (

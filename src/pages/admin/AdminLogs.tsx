@@ -12,6 +12,8 @@ const LEVEL_STYLES: Record<string, string> = {
   error: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 
+type LogRow = NonNullable<ReturnType<typeof useQuery<typeof api.admin.listLogs>>>[number];
+
 export default function AdminLogs() {
   const logs = useQuery(api.admin.listLogs);
 
@@ -38,7 +40,7 @@ export default function AdminLogs() {
           </div>
         ) : (
           <div className="divide-y">
-            {logs.map((log) => (
+            {logs.map((log: LogRow) => (
               <div key={log._id} className="flex items-start gap-3 px-4 py-3">
                 <Badge
                   variant="outline"

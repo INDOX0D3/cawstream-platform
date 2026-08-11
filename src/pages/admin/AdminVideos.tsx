@@ -81,7 +81,7 @@ export default function AdminVideos() {
                 </TableCell>
               </TableRow>
             ) : (
-              videos.map((video) => (
+              videos.map((video: VideoRow) => (
                 <TableRow key={video._id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

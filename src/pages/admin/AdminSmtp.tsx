@@ -41,6 +41,10 @@ interface SmtpForm {
   verified: boolean;
 }
 
+type SentMail = NonNullable<
+  ReturnType<typeof useQuery<typeof api.mailer.listSentEmails>>
+>[number];
+
 export default function AdminSmtp() {
   const settings = useQuery(api.settings.getAdminSettings);
   const updateSettings = useMutation(api.settings.updateSettings);
@@ -328,7 +332,7 @@ export default function AdminSmtp() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sentEmails.map((mail) => (
+                sentEmails.map((mail: SentMail) => (
                   <TableRow key={mail._id}>
                     <TableCell className="text-sm">{mail.to}</TableCell>
                     <TableCell className="max-w-[280px] truncate text-sm">{mail.subject}</TableCell>

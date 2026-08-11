@@ -15,6 +15,10 @@ import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, Sparkles, UserRound }
 import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 
+type RelatedVideo = NonNullable<
+  ReturnType<typeof useQuery<typeof api.videos.listMoreFrom>>
+>[number];
+
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
@@ -165,7 +169,7 @@ export default function Watch() {
               {t("watch.moreFrom", { user: owner.name })}
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {related.map((item) => (
+              {related.map((item: RelatedVideo) => (
                 <VideoCard
                   key={item._id}
                   video={item}

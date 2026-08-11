@@ -28,6 +28,10 @@ const PLAN_NAME: Record<string, string> = {
   platinum: "Platinum",
 };
 
+type RecentUpload = NonNullable<
+  ReturnType<typeof useQuery<typeof api.videos.getDashboardStats>>
+>["recentUploads"][number];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -170,7 +174,7 @@ export default function Dashboard() {
           />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {stats.recentUploads.map((video) => (
+            {stats.recentUploads.map((video: RecentUpload) => (
               <VideoCard key={video._id} video={video} to={`/v/${video.publicId}`} />
             ))}
           </div>

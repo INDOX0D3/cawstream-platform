@@ -152,7 +152,7 @@ export default function AdminUsers() {
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              users.map((user: UserRow) => (
                 <TableRow key={user._id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
