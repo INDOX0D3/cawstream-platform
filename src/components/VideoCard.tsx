@@ -62,12 +62,12 @@ function CopyLinksPopover({ publicId }: { publicId: string }) {
             e.preventDefault();
             e.stopPropagation();
           }}
-          className="absolute left-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 shadow backdrop-blur-sm transition-opacity hover:bg-black/80 group-hover:opacity-100"
+          className="absolute left-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white shadow backdrop-blur-sm transition-opacity hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100"
         >
           <Link2 className="size-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-3">
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3">
         <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {t("card.links")}
         </p>
@@ -136,7 +136,7 @@ export function VideoCard({
           </div>
         )}
         {isReady && (
-          <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+          <span className="absolute inset-0 flex items-center justify-center transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
             <span className="flex size-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm">
               <Play className="ml-0.5 size-5" />
             </span>
@@ -152,7 +152,7 @@ export function VideoCard({
               e.stopPropagation();
               onEdit();
             }}
-            className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white opacity-0 shadow backdrop-blur-sm transition-opacity hover:bg-black/80 group-hover:opacity-100"
+            className="absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full bg-black/60 text-white shadow backdrop-blur-sm transition-opacity hover:bg-black/80 sm:opacity-0 sm:group-hover:opacity-100"
           >
             <Pencil className="size-3.5" />
           </button>
