@@ -1,5 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /** Geometric play mark used across landing, auth, shells and the player. */
@@ -22,7 +23,11 @@ export function CawMark({ className }: { className?: string }) {
 
 /** Mark + wordmark lockup. `dark` renders the light variant (for dark heroes).
  *  When the admin has uploaded a site logo (Admin → Branding), it is shown
- *  instead of the default mark, and the site name replaces the wordmark. */
+ *  instead of the default mark, and the site name replaces the wordmark.
+ *
+ *  The default mark stays visible while the uploaded logo loads, the image
+ *  fades in once it has actually loaded, and on failure the mark remains —
+ *  so the header never shows an empty or broken loading box. */
 export function Logo({
   className,
   dark = false,
@@ -39,26 +44,43 @@ export function Logo({
   const logoUrl = src || config?.site.logoUrl || "";
   const name = config?.site.name || "CawStream";
 
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [logoUrl]);
+
+  const showImg = Boolean(logoUrl) && !imgError;
+
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 select-none",
+        "relative inline-flex items-center gap-2 select-none",
         dark ? "text-white" : "text-foreground",
         className,
       )}
     >
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt=""
-          className={cn(
-            "h-7 w-auto max-w-28 shrink-0 object-contain",
-            dark && "rounded-md bg-white/90 p-0.5",
-          )}
-        />
-      ) : (
-        <CawMark className={dark ? "bg-white rounded-md p-1 box-content size-4" : undefined} />
-      )}
+      <span className="relative inline-flex h-7 shrink-0 items-center justify-center">
+        {!showImg && (
+          <CawMark
+            className={dark ? "bg-white rounded-md p-1 box-content size-4" : undefined}
+          />
+        )}
+        {showImg && (
+          <img
+            src={logoUrl}
+            alt=""
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgError(true)}
+            className={cn(
+              "h-7 w-auto max-w-28 object-contain transition-opacity duration-200",
+              dark && "rounded-md bg-white/90 p-0.5",
+              imgLoaded ? "opacity-100" : "opacity-0",
+            )}
+          />
+        )}
+      </span>
       {!compact && (
         <span className="text-[17px] font-semibold tracking-tight">{name}</span>
       )}

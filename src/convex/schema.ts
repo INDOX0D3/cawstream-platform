@@ -164,6 +164,24 @@ const schema = defineSchema(
     }).index("by_user", ["userId"]),
 
     // -----------------------------------------------------------------------
+    // userWatermarks — per-owner brand watermark (Premium/Platinum only).
+    // A paid user's own watermark replaces the platform watermark on ALL of
+    // their videos (watch + embed) at render time; free users keep the admin
+    // branding. Enforced server-side in updateWatermark (plan check).
+    // -----------------------------------------------------------------------
+    userWatermarks: defineTable({
+      userId: v.id("users"),
+      enabled: v.boolean(),
+      text: v.string(),
+      logoUrl: v.optional(v.string()),
+      position: v.string(), // top-right | top-left | bottom-right | bottom-left | center
+      size: v.number(), // px
+      opacity: v.number(), // 0..1
+      margin: v.number(), // px
+      updatedAt: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
+
+    // -----------------------------------------------------------------------
     // videoViews — lightweight analytics. Non-invasive: viewer identity is a
     // random per-browser id (or the user's id) hashed on the server.
     // -----------------------------------------------------------------------

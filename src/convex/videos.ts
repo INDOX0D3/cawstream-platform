@@ -16,6 +16,7 @@ import { logEvent } from "./admin";
 import { getSetting } from "./settings";
 import { createMuxDirectUpload, deleteMuxAsset, getProcessingBackend } from "./processor";
 import { getAdSettingsForUser } from "./ads";
+import { applyOwnerWatermark } from "./watermark";
 import {
   DEFAULT_BRANDING,
   DEFAULT_PLAYER_SETTINGS,
@@ -485,7 +486,13 @@ async function buildEmbedPayload(ctx: MediaCtx, video: VideoDoc) {
     : thumbnailUrl;
 
   const player = (await getSetting(ctx, "player", DEFAULT_PLAYER_SETTINGS)) as PlayerSettings;
-  const branding = (await getSetting(ctx, "branding", DEFAULT_BRANDING)) as BrandingSettings;
+  // Paid owners (Premium/Platinum) may replace the platform watermark with
+  // their own brand — resolved server-side from the video's owner.
+  const branding = await applyOwnerWatermark(
+    ctx,
+    (await getSetting(ctx, "branding", DEFAULT_BRANDING)) as BrandingSettings,
+    video.ownerId,
+  );
   const site = (await getSetting(ctx, "site", DEFAULT_SITE)) as SiteSettings;
 
   // Server-side relationship: video → owner → owner's ad settings.
