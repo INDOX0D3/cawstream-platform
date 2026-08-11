@@ -189,7 +189,7 @@ const en = {
   // player preferences (dashboard)
   "playerPrefs.title": "Player preferences",
   "playerPrefs.desc":
-    "These apply when you watch any video on CawStream — they never affect what your own viewers see.",
+    "These apply when you watch any video on {site} — they never affect what your own viewers see.",
   "playerPrefs.autoplay": "Autoplay",
   "playerPrefs.autoplayDesc": "Start playback automatically when you open a video.",
   "playerPrefs.volume": "Default volume",
@@ -267,7 +267,7 @@ const en = {
   // watch page + player
   "watch.notFound": "Video not found",
   "watch.notFoundDesc": "It may have been removed or never existed.",
-  "watch.back": "Back to CawStream",
+  "watch.back": "Back to {site}",
   "watch.dashboard": "Dashboard",
   "watch.signIn": "Sign in",
   "watch.views": "{n} views",
@@ -578,7 +578,7 @@ const id: Partial<Record<DictKey, string>> = {
   // player preferences (dashboard)
   "playerPrefs.title": "Preferensi pemutar",
   "playerPrefs.desc":
-    "Berlaku saat Anda menonton video apa pun di CawStream — tidak memengaruhi tampilan video milik Anda sendiri.",
+    "Berlaku saat Anda menonton video apa pun di {site} — tidak memengaruhi tampilan video milik Anda sendiri.",
   "playerPrefs.autoplay": "Putar otomatis",
   "playerPrefs.autoplayDesc": "Mulai putar otomatis saat Anda membuka video.",
   "playerPrefs.volume": "Volume default",
@@ -648,7 +648,7 @@ const id: Partial<Record<DictKey, string>> = {
   "ads.freqAlways": "Selalu — setiap klik",
   "watch.notFound": "Video tidak ditemukan",
   "watch.notFoundDesc": "Video mungkin telah dihapus atau tidak pernah ada.",
-  "watch.back": "Kembali ke CawStream",
+  "watch.back": "Kembali ke {site}",
   "watch.dashboard": "Dashboard",
   "watch.signIn": "Masuk",
   "watch.views": "{n} tampilan",

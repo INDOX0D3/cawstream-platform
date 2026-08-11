@@ -26,6 +26,8 @@ interface PrefsForm {
 
 export default function PlayerSettings() {
   const { t } = useI18n();
+  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteName = siteConfig?.site.name || "CawStream";
   const existing = useQuery(api.playerPrefs.getMyPlayerSettings);
   const update = useMutation(api.playerPrefs.updatePlayerSettings);
   const [form, setForm] = useState<PrefsForm | null>(null);
@@ -72,7 +74,7 @@ export default function PlayerSettings() {
       <Card>
         <CardHeader>
           <CardTitle>{t("playerPrefs.title")}</CardTitle>
-          <CardDescription>{t("playerPrefs.desc")}</CardDescription>
+          <CardDescription>{t("playerPrefs.desc", { site: siteName })}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between gap-4">

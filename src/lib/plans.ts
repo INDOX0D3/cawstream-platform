@@ -43,9 +43,9 @@ export function formatPriceIdr(plan: PlanId): string {
 }
 
 /** Build the wa.me deep link with a prefilled message for a plan. */
-export function waSubscribeLink(plan: PlanId, extra?: string): string {
+export function waSubscribeLink(plan: PlanId, extra?: string, site?: string): string {
   const text = [
-    `Halo, saya ingin berlangganan CawStream ${PLAN_LABEL[plan]}`,
+    `Halo, saya ingin berlangganan ${site || "CawStream"} ${PLAN_LABEL[plan]}`,
     PLANS[plan].priceIdr
       ? `(${formatPriceIdr(plan)}/bulan).`
       : ".",

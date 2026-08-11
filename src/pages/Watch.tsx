@@ -20,6 +20,8 @@ export default function Watch() {
   const { isAuthenticated } = useAuth();
   const { t } = useI18n();
   const payload = useQuery(api.videos.getWatch, { publicId });
+  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteName = siteConfig?.site.name || "CawStream";
   const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(
     api.playerPrefs.getMyPlayerSettings,
@@ -66,7 +68,7 @@ export default function Watch() {
           <p className="mt-1 text-sm text-muted-foreground">{t("watch.notFoundDesc")}</p>
         </div>
         <Link to="/">
-          <Button variant="outline">{t("watch.back")}</Button>
+          <Button variant="outline">{t("watch.back", { site: siteName })}</Button>
         </Link>
       </div>
     );

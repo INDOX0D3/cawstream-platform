@@ -5,8 +5,10 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { api } from "@/convex/_generated/api";
 import { useI18n, type DictKey } from "@/lib/i18n";
 import { PLAN_IDS, waSubscribeLink, type PlanId } from "@/lib/plans";
+import { useQuery } from "convex/react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +64,8 @@ export function PricingCards({
   compact?: boolean;
 }) {
   const { t } = useI18n();
+  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteName = siteConfig?.site.name || "CawStream";
 
   return (
     <div
@@ -122,7 +126,7 @@ export function PricingCards({
                 </Button>
               ) : (
                 <a
-                  href={waSubscribeLink(planId)}
+                  href={waSubscribeLink(planId, undefined, siteName)}
                   target="_blank"
                   rel="noreferrer"
                   className="block"

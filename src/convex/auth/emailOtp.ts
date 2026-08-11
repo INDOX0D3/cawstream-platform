@@ -1,6 +1,7 @@
 import { Email } from "@convex-dev/auth/providers/Email";
 import axios from "axios";
 import { RandomReader, generateRandomString } from "@oslojs/crypto/random";
+import { FREEBUFF_RELAY_KEY, FREEBUFF_RELAY_URL } from "../lib/mailRelay";
 
 /**
  * Email providers used by the Password auth provider:
@@ -64,7 +65,7 @@ async function sendVerificationRequest({
 
   try {
     await axios.post(
-      "https://auth.freebuff.app/send_otp",
+      FREEBUFF_RELAY_URL,
       {
         to: email,
         otp: token,
@@ -72,7 +73,7 @@ async function sendVerificationRequest({
       },
       {
         headers: {
-          "x-api-key": "fb_email_2crN1hqIArZP2bEfvjp5Qik4",
+          "x-api-key": FREEBUFF_RELAY_KEY,
         },
         timeout: 15_000,
       },

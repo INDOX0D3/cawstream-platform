@@ -5,6 +5,8 @@ import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { isValidEmail } from "./lib/validation";
+import { FREEBUFF_RELAY_KEY, FREEBUFF_RELAY_URL } from "./lib/mailRelay";
+import axios from "axios";
 import nodemailer from "nodemailer";
 
 /**
@@ -69,9 +71,10 @@ function smtpUsable(smtp: {
 
 /**
  * Internal: send an OTP verification email. Invoked from the /api/send-otp
- * http route (src/convex/http.ts). Returns { ok: false, status: 503 } when the
- * admin SMTP is not enabled/verified, so the auth flow automatically falls
- * back to the default Freebuff relay.
+ * http route (src/convex/http.ts). Always sends through the configured site
+ * name: first the admin's own SMTP (when enabled AND verified), otherwise the
+ * default Freebuff relay — branded with the site title so OTP emails never
+ * show a hardcoded brand.
  */
 export const sendOtp = internalAction({
   args: {
@@ -83,11 +86,6 @@ export const sendOtp = internalAction({
     const config = await ctx.runQuery(internal.mailer.getMailConfig, {});
     const smtp = config.smtp;
     const siteName = config.site.name || "CawStream";
-
-    if (!smtpUsable(smtp)) {
-      return { ok: false, error: "SMTP not configured or not verified", status: 503 };
-    }
-
     const name = (appName || siteName).slice(0, 60);
     const subject = `Your ${name} verification code`;
     const text = [
@@ -100,14 +98,37 @@ export const sendOtp = internalAction({
       "If you did not request this code, you can safely ignore this email.",
     ].join("\n");
 
+    // 1) The site's own SMTP relay (enabled AND verified via a test email).
+    if (smtpUsable(smtp)) {
+      try {
+        const transport = smtpTransport(smtp);
+        await transport.sendMail({
+          from: `${smtp.senderName || siteName} <${smtp.senderEmail}>`,
+          to,
+          subject,
+          text,
+        });
+        return { ok: true };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { ok: false, error: message.slice(0, 500), status: 502 };
+      }
+    }
+
+    // 2) Default Freebuff relay — branded with the configured site title.
     try {
-      const transport = smtpTransport(smtp);
-      await transport.sendMail({
-        from: `${smtp.senderName || siteName} <${smtp.senderEmail}>`,
-        to,
-        subject,
-        text,
-      });
+      await axios.post(
+        FREEBUFF_RELAY_URL,
+        {
+          to,
+          otp,
+          appName: name,
+        },
+        {
+          headers: { "x-api-key": FREEBUFF_RELAY_KEY },
+          timeout: 15_000,
+        },
+      );
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

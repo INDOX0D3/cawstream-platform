@@ -72,7 +72,7 @@ const STATS: Array<{ icon: typeof UploadCloud; value: DictKey; label: DictKey }>
   { icon: Code2, value: "landing.stat4Value", label: "landing.stat4Label" },
 ];
 
-function PlayerMock() {
+function PlayerMock({ siteName = "CawStream" }: { siteName?: string }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
       {/* faux browser chrome */}
@@ -94,7 +94,7 @@ function PlayerMock() {
         {/* watermark */}
         <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded bg-black/40 px-2 py-1 text-[11px] font-medium text-white/80">
           <CawMark className="size-3.5 text-white" />
-          CawStream
+          {siteName}
         </span>
         {/* duration pill */}
         <span className="absolute bottom-3 right-3 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-white">
@@ -264,7 +264,7 @@ export default function Landing() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="mx-auto mt-14 max-w-3xl"
           >
-            <PlayerMock />
+            <PlayerMock siteName={config?.site.name || "CawStream"} />
           </motion.div>
 
           <div className="mt-10">

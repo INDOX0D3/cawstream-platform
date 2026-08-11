@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
+import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguageSwitcher, useI18n, type DictKey } from "@/lib/i18n";
+import { useQuery } from "convex/react";
 import { cn } from "@/lib/utils";
 import {
   Clapperboard,
@@ -191,6 +193,8 @@ function ShellFrame({
 }) {
   const { user, signOut, isLoading } = useAuth();
   const { t } = useI18n();
+  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteName = siteConfig?.site.name || "CawStream";
   const navigate = useNavigate();
   const location = useLocation();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -240,7 +244,7 @@ function ShellFrame({
             <p className="text-center text-[11px] leading-4 text-muted-foreground">
               {t("nav.shellFooter")}
               <br />
-              CawStream
+              {siteName}
             </p>
           )}
         </div>
