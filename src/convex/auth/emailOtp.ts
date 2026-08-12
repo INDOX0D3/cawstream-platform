@@ -93,7 +93,21 @@ async function sendVerificationRequest({
     );
   } catch (error) {
     console.error("[cawstream][email] failed to send OTP:", error);
-    throw new Error("We could not send the verification email. Please try again.");
+    // Surface the relay's real reason (e.g. it rejects example.com-style
+    // addresses) so the sign-up form shows an actionable message instead of a
+    // generic "Server Error".
+    const axiosError = error as {
+      response?: { data?: { message?: string; error?: { message?: string } } };
+    };
+    const detail =
+      axiosError.response?.data?.message ??
+      axiosError.response?.data?.error?.message ??
+      "";
+    throw new Error(
+      detail
+        ? `We could not send the verification email: ${detail}`
+        : "We could not send the verification email. Please try again.",
+    );
   }
 }
 

@@ -54,18 +54,23 @@ Buka project Convex → **Settings → Environment variables**, tambahkan:
 
 | Nama | Nilai | Fungsi |
 |---|---|---|
-| `CONVEX_SITE_URL` | **WAJIB** = `https://nama-hewan-123.convex.cloud` | Alamat backend yang dipakai route HTTP (OTP email) dan validasi token auth |
+| `CONVEX_SITE_URL` | **JANGAN di-set** (biarkan otomatis) — atau set ke `https://nama-hewan-123.convex.site` | Dipakai backend untuk route HTTP (OTP email) dan validasi token auth |
 | `FREEBUFF_RELAY_URL` / `FREEBUFF_RELAY_KEY` | (opsional) | Relay email cadangan kalau SMTP belum dikonfigurasi |
 
-> ⚠️ **PENTING — `CONVEX_SITE_URL` harus URL deployment Convex, BUKAN domain VPS kamu.**
-> Backend memakai `CONVEX_SITE_URL` untuk dua hal kritis:
-> 1. **Kirim email OTP** → POST ke `${CONVEX_SITE_URL}/api/send-otp` (route HTTP Convex).
-> 2. **Validasi token login** → fetch `${CONVEX_SITE_URL}/.well-known/openid-configuration`.
+> ⚠️ **PENTING — `CONVEX_SITE_URL` jangan pernah di-set ke `.convex.cloud` dan jangan ke domain VPS.**
+> Convex **otomatis** mengisi `CONVEX_SITE_URL` dengan site URL deployment: `https://nama-hewan-123.convex.site`
+> (dokumentasi resmi: *system environment variables, always available*). Route HTTP Convex
+> (`/api/send-otp`) dan `/.well-known/openid-configuration` **hanya hidup di site URL (`.convex.site`)**,
+> bukan di `.convex.cloud` (404) dan bukan di nginx VPS (index.html).
 >
-> Kedua path itu hanya disajikan oleh Convex di URL deployment (`https://nama-hewan-123.convex.cloud/...`).
-> Kalau kamu isi domain VPS (mis. `https://domainkamu.com`), nginx VPS yang hanya serve file statis akan
-> membalas index.html untuk kedua path itu → OTP tidak pernah terkirim dan/atau login tidak pernah terverifikasi
-> → **sign-in stuck tanpa error apa pun**. Selalu pakai URL deployment Convex di sini.
+> Kalau variabel ini di-override dengan nilai yang salah, dua hal kritis rusak:
+> 1. **Kirim email OTP** → POST ke `${CONVEX_SITE_URL}/api/send-otp` → 404 → email tidak terkirim.
+> 2. **Validasi token login** → fetch `${CONVEX_SITE_URL}/.well-known/openid-configuration` → 404 →
+>    token tidak pernah valid → **sign-in stuck tanpa error**.
+>
+> **Solusi: hapus `CONVEX_SITE_URL` dari dashboard Convex** (pakai default otomatis `.convex.site`),
+> atau kalau mau eksplisit set ke `https://nama-hewan-123.convex.site`. Setelah mengubah env, tidak
+> perlu redeploy — langsung berlaku.
 
 ---
 
@@ -177,8 +182,8 @@ sudo cp -r dist/* /var/www/cawstream/   # nginx bare-metal
 |---|---|
 | Preview/website blank atau "Did you forget to run convex dev?" | `VITE_CONVEX_URL` salah/tidak diisi saat build. Build ulang dengan URL deployment yang benar. |
 | `bunx convex deploy` gagal | Cek `CONVEX_DEPLOYMENT` / `convex.json`, pastikan login Convex (`bunx convex login`). |
-| Signup tidak terkirim OTP | 1) Cek `CONVEX_SITE_URL` di dashboard Convex — harus URL deployment (`https://nama-hewan-123.convex.cloud`), bukan domain VPS. 2) Kalau sudah benar, atur **Admin → SMTP** sampai banner hijau *Active and verified* (fallback relay Freebuff tetap jalan selama SMTP belum verified). |
-| Sign-in stuck / spinner terus / tidak masuk dashboard (tanpa error) | `CONVEX_SITE_URL` salah — lihat catatan ⚠️ di bagian 2. Pastikan = URL deployment Convex, lalu redeploy backend (`bunx convex deploy`) dan rebuild frontend. |
+| Signup tidak terkirim OTP | 1) Cek `CONVEX_SITE_URL` — kalau ada di dashboard Convex dan nilainya bukan `.convex.site`, **hapus** (lihat catatan ⚠️ di bagian 2). 2) Coba pakai **email asli** (mis. Gmail) — relay bawaan menolak alamat seperti `example.com`. 3) Atur **Admin → SMTP** sampai banner hijau *Active and verified* supaya email independen dari relay bawaan. |
+| Sign-in stuck / spinner terus / tidak masuk dashboard (tanpa error) | `CONVEX_SITE_URL` ter-override dengan nilai salah (mis. `.convex.cloud`) — **hapus dari dashboard Convex** supaya pakai default `.convex.site`. Kemudian coba lagi (env berlaku tanpa redeploy; frontend tidak perlu rebuild). |
 | Link preview di medsos tidak muncul | Pastikan domain HTTPS valid; og:image memakai thumbnail video dari Convex. |
 | Upload besar gagal | Limit upload diatur di **Admin → System → Max upload size**; storage Convex punya batas file — naikkan plan Convex jika perlu. |
 | Tombol langganan membuka WhatsApp | Sudah diganti — pastikan build terbaru (semua link pakai **Telegram** t.me/cawsociety). |
@@ -195,9 +200,10 @@ Browser ──► nginx (VPS, port 80/443) ──► dist/ (statis)
 ```
 
 Frontend memanggil Convex langsung (HTTPS) — VPS tidak perlu memproksi apa pun, cukup menyajikan file statis.
-`CONVEX_SITE_URL` di dashboard Convex harus diisi URL deployment (`https://<deployment>.convex.cloud`) —
-itu alamat yang dipakai backend untuk route OTP & validasi token. Jangan isi domain VPS.
+`CONVEX_SITE_URL` **jangan di-set manual** — Convex otomatis mengisinya dengan site URL
+`https://<deployment>.convex.site`, dan di situlah route OTP & validasi token hidup.
 
 > *Pilihan lanjutan:* kalau kamu tetap ingin `CONVEX_SITE_URL` = domain VPS (mis. agar terlihat rapi),
-> VPS wajib memproksi path Convex ke deployment — lihat blok opsional `location /api/` + `/.well-known/`
-> di `deploy/nginx-site.conf`. Cara paling sederhana & disarankan tetap pakai URL deployment.
+> VPS wajib memproksi path Convex ke **site URL** (`.convex.site`) — lihat blok opsional
+> `location /api/` + `/.well-known/` di `deploy/nginx-site.conf`. Cara paling sederhana & disarankan
+> tetap biarkan default `.convex.site`.
