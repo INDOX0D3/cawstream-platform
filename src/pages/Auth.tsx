@@ -50,6 +50,42 @@ function resolveRedirectAfterAuth(returnTo: string | null, fallback = "/dashboar
   return fallback;
 }
 
+/** Turn a Convex auth error into a clean, human-readable message. Convex
+ *  errors arrive as "[CONVEX A(auth:signIn)] [Request ID: …] Server Error …"
+ *  — we strip that noise and map known failure modes to friendly copy, so
+ *  internal error IDs are never shown to the user. Anything unrecognized
+ *  falls back to the per-call fallback message. */
+function friendlyAuthError(
+  err: unknown,
+  fallback: string,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  const raw = err instanceof Error && err.message ? err.message : "";
+  const clean = raw
+    .replace(/\[CONVEX\s+[^\]]*\]/g, " ")
+    .replace(/\[Request ID:\s*[^\]]*\]/g, " ")
+    .replace(/^Server Error\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const lower = clean.toLowerCase();
+  if (/invalid (verification )?code|expired verification code|code.*(invalid|expired)/.test(lower)) {
+    return t("auth.wrongCode");
+  }
+  if (/invalid password|wrong password|incorrect password/.test(lower)) {
+    return t("auth.wrongPassword");
+  }
+  if (/invalid credentials|no account|not found|doesn't exist|does not exist|unregistered/.test(lower)) {
+    return t("auth.accountNotFound");
+  }
+  if (/too many failed attempts|rate limit/.test(lower)) {
+    return t("auth.tooManyAttempts");
+  }
+  if (/deleted/.test(lower)) {
+    return t("auth.accountDeleted");
+  }
+  return fallback;
+}
+
 type Step =
   | { mode: "signIn" }
   | { mode: "plans" }
@@ -97,8 +133,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   }, [authLoading, isAuthenticated, navigate, redirect]);
 
   const fail = (err: unknown, fallback: string) => {
-    const message = err instanceof Error && err.message ? err.message : fallback;
-    setError(message);
+    setError(friendlyAuthError(err, fallback, t));
     setIsLoading(false);
   };
 

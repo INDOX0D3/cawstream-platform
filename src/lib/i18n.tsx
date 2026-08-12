@@ -160,9 +160,8 @@ const en = {
   "videos.codec": "Codec",
   "videos.viewsStats": "{views} views · {n} unique",
   "videos.noViews": "No views in the last 13 days yet.",
-  "videos.embedCode": "Embed code",
-  "videos.startFullscreen": "Start in fullscreen",
-  "videos.copyEmbed": "Copy embed code",
+  "videos.embedLink": "Embed link",
+  "videos.copyEmbedUrl": "Copy embed URL",
   "videos.watchPage": "Watch page",
   "videos.directMp4": "Direct MP4",
   "videos.thumbnail": "Thumbnail",
@@ -383,6 +382,13 @@ const en = {
     "An account with this email already exists — sign in instead, or use “Forgot password”.",
   "auth.signInInstead": "Sign in instead",
   "auth.verifiedSignedIn": "Password updated — you're signed in",
+  "auth.wrongPassword": "Wrong password. Check your password and try again.",
+  "auth.accountNotFound":
+    "No account is registered with this email yet. Create an account first.",
+  "auth.wrongCode": "That code is invalid or has expired. Request a new code.",
+  "auth.tooManyAttempts": "Too many failed attempts. Try again in a few minutes.",
+  "auth.accountDeleted":
+    "This account is no longer available. Contact support if you think this is a mistake.",
 
   // landing
   "landing.features": "Features",
@@ -657,9 +663,8 @@ const id: Partial<Record<DictKey, string>> = {
   "videos.codec": "Codec",
   "videos.viewsStats": "{views} tampilan · {n} unik",
   "videos.noViews": "Belum ada tampilan dalam 13 hari terakhir.",
-  "videos.embedCode": "Kode embed",
-  "videos.startFullscreen": "Mulai fullscreen",
-  "videos.copyEmbed": "Salin kode embed",
+  "videos.embedLink": "Link embed",
+  "videos.copyEmbedUrl": "Salin URL embed",
   "videos.watchPage": "Halaman tonton",
   "videos.directMp4": "MP4 langsung",
   "videos.thumbnail": "Thumbnail",
@@ -787,6 +792,11 @@ const id: Partial<Record<DictKey, string>> = {
     "Akun dengan email ini sudah ada — masuk saja, atau gunakan “Lupa kata sandi”.",
   "auth.signInInstead": "Masuk saja",
   "auth.verifiedSignedIn": "Kata sandi diperbarui — Anda sudah masuk",
+  "auth.wrongPassword": "Kata sandi salah. Periksa kembali kata sandi Anda.",
+  "auth.accountNotFound": "Belum ada akun yang terdaftar dengan email ini. Daftar dulu ya.",
+  "auth.wrongCode": "Kode itu tidak valid atau sudah kedaluwarsa. Minta kode baru.",
+  "auth.tooManyAttempts": "Terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.",
+  "auth.accountDeleted": "Akun ini tidak tersedia lagi. Hubungi dukungan jika menurut Anda ini keliru.",
 
   // landing
   "landing.features": "Fitur",
