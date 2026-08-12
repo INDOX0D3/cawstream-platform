@@ -53,7 +53,20 @@ async function sendVerificationRequest({
           timeout: 15_000,
         },
       );
-      if (res.status === 200) return; // delivered through the site's SMTP
+      // Only treat the OTP as delivered when the Convex HTTP route actually
+      // answered with JSON { ok: true }. If CONVEX_SITE_URL points at a static
+      // server (e.g. an nginx SPA fallback returning index.html with HTTP 200),
+      // a bare 200 must NOT count as delivered — otherwise the OTP email is
+      // never sent and sign-in silently hangs. In that case we fall through to
+      // the default relay below so the user still receives the code.
+      const contentType = String(res.headers["content-type"] ?? "");
+      if (
+        res.status === 200 &&
+        typeof res.data?.ok === "boolean" &&
+        contentType.includes("application/json")
+      ) {
+        if (res.data.ok) return; // delivered through the site's SMTP/relay
+      }
     } catch (error) {
       // 503 = SMTP not configured yet — fall through to the default relay.
       const status = (error as { response?: { status?: number } })?.response?.status;
