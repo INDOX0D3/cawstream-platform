@@ -7,20 +7,28 @@
  *
  * Frequency (set per user in Advertisements):
  *  - "session" (default): smartlink + popunder fire at most once per browsing
- *    session (sessionStorage), on the first click inside the player.
+ *    session (sessionStorage).
  *  - "always": they fire on every click anywhere in the player screen, on the
  *    watch page and the embed alike.
  * In both modes the Social Bar banner stays visible continuously while enabled.
+ *
+ * Why popunder and smartlink fire on separate events:
+ *  Most browsers only let ONE popup through per user gesture. Firing both on
+ *  the same `pointerdown` meant the second window.open (the popunder) was
+ *  silently blocked — the exact "only the redirect works" symptom. So the
+ *  popunder fires on `pointerdown` (the first popup of the gesture) and the
+ *  smartlink on the subsequent `click`. If a popup is still blocked, it is
+ *  NOT marked as fired and simply retries on the next gesture.
  *
  * Isolation rules:
  *  - Social Bar code runs inside a sandboxed iframe (sandbox="allow-scripts")
  *    so it can never touch the app DOM, cookies or session.
  *  - Popunder code runs in a fresh popup window whose `opener` is detached
  *    immediately, never inside the app.
- *  - Smartlink is a plain https:// link opened with noopener.
+ *  - Smartlink is a plain https:// link opened with the opener detached.
  *  - Nothing here is ever rendered on dashboard, admin or auth pages.
  */
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 export type AdFrequency = "session" | "always";
@@ -111,11 +119,14 @@ function buildSocialBarDoc(code: string): string {
   ].join("");
 }
 
-/** Popunder: fresh popup window, ad code runs there, opener detached. */
-function openPopunder(code: string): void {
+/**
+ * Popunder: fresh popup window, ad code runs there, opener detached.
+ * Returns true when the popup actually opened (not blocked by the browser).
+ */
+function openPopunder(code: string): boolean {
   try {
     const win = window.open("about:blank", "_blank", "width=420,height=640");
-    if (!win) return;
+    if (!win) return false;
     win.document.write(
       "<!doctype html><html><head><meta charset='utf-8'><title>Advertisement</title></head><body style='margin:0'>",
     );
@@ -127,8 +138,10 @@ function openPopunder(code: string): void {
     } catch {
       /* ignore */
     }
+    return true;
   } catch {
     /* popup blocked or failed — never break playback */
+    return false;
   }
 }
 
@@ -141,11 +154,9 @@ export function AdManager({
   containerRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
 }) {
-  const firedRef = useRef(false);
-
-  // Smartlink + popunder — fire on clicks inside the player. In "session" mode
-  // each fires at most once per browsing session; in "always" mode they fire on
-  // every click (all parts of the player screen, watch page and embed).
+  // Smartlink + popunder. Each popup gets its own user gesture so the browser
+  // popup blocker can't drop the second one (see module comment). A blocked
+  // popup is never marked as fired, so it retries on the next gesture.
   useEffect(() => {
     const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
     const popunderOn = ads.popunderEnabled && ads.popunderCode;
@@ -154,27 +165,40 @@ export function AdManager({
     const el = containerRef.current;
     if (!el) return;
 
-    const handler = () => {
+    const firePopunder = () => {
+      if (!popunderOn) return;
       const always = ads.frequency === "always";
-      if (!always && firedRef.current) return; // session mode: one per mount
-      firedRef.current = true;
-
-      if (smartlinkOn) {
-        if (always || !sessionFired(smartlinkKey(ads.smartlinkUrl))) {
-          markSessionFired(smartlinkKey(ads.smartlinkUrl));
-          window.open(ads.smartlinkUrl, "_blank", "noopener");
-        }
-      }
-      if (popunderOn) {
-        if (always || !sessionFired(popunderKey(ads.popunderCode))) {
-          markSessionFired(popunderKey(ads.popunderCode));
-          openPopunder(ads.popunderCode);
-        }
+      if (!always && sessionFired(popunderKey(ads.popunderCode))) return;
+      if (openPopunder(ads.popunderCode) && !always) {
+        markSessionFired(popunderKey(ads.popunderCode));
       }
     };
 
-    el.addEventListener("pointerdown", handler);
-    return () => el.removeEventListener("pointerdown", handler);
+    const fireSmartlink = () => {
+      if (!smartlinkOn) return;
+      const always = ads.frequency === "always";
+      if (!always && sessionFired(smartlinkKey(ads.smartlinkUrl))) return;
+      const win = window.open(ads.smartlinkUrl, "_blank");
+      if (win) {
+        try {
+          win.opener = null;
+        } catch {
+          /* ignore */
+        }
+        if (!always) markSessionFired(smartlinkKey(ads.smartlinkUrl));
+      }
+      // Blocked (null) → not marked as fired → retried on the next gesture.
+    };
+
+    const onPointerDown = () => firePopunder();
+    const onClick = () => fireSmartlink();
+
+    el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("click", onClick);
+    return () => {
+      el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("click", onClick);
+    };
   }, [
     ads.smartlinkEnabled,
     ads.smartlinkUrl,
@@ -189,11 +213,11 @@ export function AdManager({
   if (!socialVisible) return null;
 
   return (
-    <div className={cn("absolute inset-x-0 top-0 z-30", className)}>
+    <div className={cn("absolute inset-x-0 top-0 z-40", className)}>
       <div className="relative h-14 w-full border-b border-white/10 bg-black/40">
         <iframe
           title="Advertisement"
-          sandbox="allow-scripts allow-popups"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           srcDoc={buildSocialBarDoc(ads.socialBarCode)}
           className="h-full w-full border-0"
         />
