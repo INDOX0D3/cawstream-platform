@@ -11,9 +11,12 @@
  *    ad network's instruction — "use one popunder per page"). It fires while
  *    the player page is open (usually on first interaction, which is what
  *    browsers allow), and every window it opens is tracked.
- *  - Social bar: the owner's snippet is rendered INSIDE the video player as a
- *    bottom overlay (above the player controls), so the ad banner is attached
- *    to the video itself — not floating on the page outside the video.
+ *  - Social bar: the owner's snippet is rendered INSIDE the video frame as an
+ *    overlay on the LEFT side, vertically aligned with the watermark — the
+ *    ad is attached to the video content itself, never to the page outside
+ *    the player. Adsterra-style snippets self-insert their banner into
+ *    <body>, so a MutationObserver relocates whatever the snippet appends
+ *    into the in-player host and forces it back into normal flow.
  *  - Smartlink: plain click-based https:// redirect with the opener detached.
  *
  * Lifecycle — ads belong to the player page only:
@@ -202,9 +205,12 @@ function runCodeIn(host: HTMLElement, code: string): void {
 export function AdManager({
   ads,
   containerRef,
+  watermarkPosition,
 }: {
   ads: AdsConfig;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Branding watermark position — the social bar aligns with it vertically. */
+  watermarkPosition?: string;
   className?: string;
 }) {
   const popunderOn = ads.popunderEnabled && ads.popunderCode;
@@ -255,32 +261,74 @@ export function AdManager({
     };
   }, [popunderOn, ads.popunderCode, ads.frequency]);
 
-  // Social bar — rendered INSIDE the video player as a bottom overlay, so
-  // the banner is attached to the video itself ("ads inside the player"),
-  // not floating on the page outside the video. The host div carries a
-  // transform, which makes any position:fixed elements inside the network's
-  // snippet position relative to the player instead of the viewport. On the
-  // embed page the player fills the screen, so the bar sits at the bottom of
-  // the screen there; on the watch page it sits at the bottom of the video.
+  // Social bar — rendered INSIDE the video frame as an in-video overlay on
+  // the LEFT side, vertically aligned with the watermark (top-left when the
+  // watermark is top-right, etc.), so the ad is attached to the video
+  // content itself — never to the page outside the player.
+  //
+  // The host div carries a transform, which makes any position:fixed
+  // elements inside the network's snippet position relative to the player
+  // instead of the viewport. Adsterra-style snippets self-insert their
+  // banner into <body> (they are told to be pasted above </body>), so a
+  // MutationObserver relocates anything the snippet appends into this
+  // in-player host and forces it back into normal flow.
   useEffect(() => {
     if (!socialOn) return;
     if (document.getElementById("cawstream-social-bar")) return;
     const host = containerRef.current ?? document.body;
+
+    // Vertical placement follows the watermark's position; horizontal is
+    // always LEFT ("put it on the left, next to the watermark").
+    const anchor = (watermarkPosition ?? "").toLowerCase();
+    const justify = anchor.includes("top")
+      ? "flex-start"
+      : anchor.includes("bottom")
+        ? "flex-end"
+        : "center";
+
     const bar = document.createElement("div");
     bar.id = "cawstream-social-bar";
     bar.style.cssText =
-      "position:absolute;inset:auto 0 0 0;display:flex;flex-direction:column;" +
-      "justify-content:flex-end;max-height:100%;overflow:hidden;z-index:9000;" +
-      "pointer-events:auto;transform:translateZ(0);";
+      "position:absolute;left:0;top:0;bottom:0;display:flex;flex-direction:column;" +
+      `justify-content:${justify};align-items:flex-start;max-width:100%;` +
+      "overflow:hidden;z-index:9000;pointer-events:auto;transform:translateZ(0);";
     // Clicks on the ad banner must not pause/play the player underneath.
     bar.addEventListener("click", (e) => e.stopPropagation());
     bar.addEventListener("pointerdown", (e) => e.stopPropagation());
     host.appendChild(bar);
     runCodeIn(bar, ads.socialBarCode);
+
+    // Catch the banner the snippet injects into <body> and move it into the
+    // in-player host, forcing it back into normal flow so it sits on the
+    // left inside the video instead of floating at the viewport bottom.
+    const relocated = new WeakSet<Node>();
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (!(node instanceof HTMLElement)) continue;
+          if (node === bar || bar.contains(node) || relocated.has(node)) continue;
+          relocated.add(node);
+          try {
+            node.style.setProperty("position", "relative", "important");
+            node.style.setProperty("inset", "auto", "important");
+            node.style.setProperty("max-width", "100%", "important");
+          } catch {
+            /* ignore */
+          }
+          bar.appendChild(node);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: false });
+    // Stop relocating once the snippet has had time to finish injecting.
+    const stop = window.setTimeout(() => observer.disconnect(), 4000);
+
     return () => {
+      window.clearTimeout(stop);
+      observer.disconnect();
       bar.remove();
     };
-  }, [socialOn, ads.socialBarCode, containerRef]);
+  }, [socialOn, ads.socialBarCode, containerRef, watermarkPosition]);
 
   // Smartlink — fires on clicks inside the player. Uses the pristine
   // window.open so its tab is a deliberate user action and is never tracked

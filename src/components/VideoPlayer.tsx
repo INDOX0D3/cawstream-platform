@@ -564,7 +564,11 @@ export function VideoPlayer({
         className,
       )}
     >
-      <AdManager ads={ads} containerRef={containerRef} />
+      <AdManager
+        ads={ads}
+        containerRef={containerRef}
+        watermarkPosition={branding.watermarkPosition}
+      />
 
       {/* Watermark */}
       {showWatermark && (
