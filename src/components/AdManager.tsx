@@ -289,8 +289,8 @@ export function AdManager({
     const bar = document.createElement("div");
     bar.id = "cawstream-social-bar";
     bar.style.cssText =
-      "position:absolute;left:0;top:0;bottom:0;display:flex;flex-direction:column;" +
-      `justify-content:${justify};align-items:flex-start;max-width:100%;` +
+      "position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;" +
+      `justify-content:${justify};align-items:flex-start;width:100%;min-width:0;` +
       "overflow:hidden;z-index:9000;pointer-events:auto;transform:translateZ(0);";
     // Clicks on the ad banner must not pause/play the player underneath.
     bar.addEventListener("click", (e) => e.stopPropagation());
