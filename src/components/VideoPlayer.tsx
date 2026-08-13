@@ -150,6 +150,7 @@ export function VideoPlayer({
   autoFullscreen = false,
   fill = false,
   showFullscreen = true,
+  adsEnabled = true,
 }: {
   video: PlayerVideo;
   ads: AdsConfig;
@@ -162,6 +163,9 @@ export function VideoPlayer({
   fill?: boolean;
   /** Show the fullscreen button (and f/double-click shortcuts). Off on the watch page. */
   showFullscreen?: boolean;
+  /** Run the owner's ads (popunder/social bar/smartlink). Embed only — the
+   *  watch page keeps ads off. */
+  adsEnabled?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -568,6 +572,7 @@ export function VideoPlayer({
         ads={ads}
         containerRef={containerRef}
         watermarkPosition={branding.watermarkPosition}
+        enabled={adsEnabled}
       />
 
       {/* Watermark */}

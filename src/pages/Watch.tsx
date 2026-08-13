@@ -112,6 +112,7 @@ export default function Watch() {
           player={player}
           userPrefs={userPrefs}
           showFullscreen
+          adsEnabled={false}
         />
 
         <div className="mt-6 space-y-5">

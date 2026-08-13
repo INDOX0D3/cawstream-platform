@@ -254,16 +254,20 @@ export function AdManager({
   ads,
   containerRef,
   watermarkPosition,
+  enabled = true,
 }: {
   ads: AdsConfig;
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** Branding watermark position — the social bar aligns with it vertically. */
   watermarkPosition?: string;
+  /** When false no ads run at all (watch page keeps ads off; embed only). */
+  enabled?: boolean;
   className?: string;
 }) {
-  const popunderOn = ads.popunderEnabled && ads.popunderCode;
-  const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
-  const socialOn = ads.socialBarEnabled && ads.socialBarCode;
+  const popunderOn = enabled && ads.popunderEnabled && ads.popunderCode;
+  const smartlinkOn =
+    enabled && ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
+  const socialOn = enabled && ads.socialBarEnabled && ads.socialBarCode;
 
   // Guard counter — StrictMode-safe and independent of session gating. It
   // counts "a player page with ads is mounted", so snippets (and the
