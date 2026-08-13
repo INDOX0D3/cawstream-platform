@@ -33,7 +33,7 @@ export default function AdminOverview() {
     <div className="space-y-6">
       <PageHeader
         title="Platform overview"
-        description={`Everything happening across your ${siteConfig?.site.name || "CawStream"} deployment.`}
+        description={`Everything happening across your ${siteConfig?.site.name || "Vidood Stream"} deployment.`}
         actions={
           <Badge variant="outline" className="gap-1.5">
             <Cpu className="size-3" />

@@ -25,7 +25,7 @@ export default function Watch() {
   const { t } = useI18n();
   const payload = useQuery(api.videos.getWatch, { publicId });
   const siteConfig = useQuery(api.settings.getPublicConfig);
-  const siteName = siteConfig?.site.name || "CawStream";
+  const siteName = siteConfig?.site.name || "Vidood Stream";
   const related = useQuery(api.videos.listMoreFrom, { publicId });
   const personal = useQuery(
     api.playerPrefs.getMyPlayerSettings,

@@ -51,7 +51,7 @@ export function telegramSubscribeLink(
   site?: string,
 ): string {
   const text = [
-    `Halo, saya ingin berlangganan ${site || "CawStream"} ${PLAN_LABEL[plan]}`,
+    `Halo, saya ingin berlangganan ${site || "Vidood Stream"} ${PLAN_LABEL[plan]}`,
     PLANS[plan].priceIdr
       ? `(${formatPriceIdr(plan)}/bulan).`
       : ".",

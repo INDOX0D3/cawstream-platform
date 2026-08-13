@@ -52,7 +52,7 @@ function upsertLink(rel: string, href: string) {
  *  video pages override the tags with real video data afterwards. */
 export function applySiteMeta(site: SiteMeta) {
   const title =
-    site.metaTitle || (site.name ? `${site.name} — Video hosting & streaming` : "CawStream");
+    site.metaTitle || (site.name ? `${site.name} — Video hosting & streaming` : "Vidood Stream");
   const description =
     site.metaDescription ||
     "Upload, host and stream videos with a custom player, embed codes, play-button link previews and honest analytics.";
@@ -71,7 +71,7 @@ export function applySiteMeta(site: SiteMeta) {
     upsertLink("apple-touch-icon", site.logoUrl);
   }
   upsertMeta("property", "og:type", "website");
-  upsertMeta("property", "og:site_name", site.name || "CawStream");
+  upsertMeta("property", "og:site_name", site.name || "Vidood Stream");
   upsertMeta("property", "og:title", title);
   upsertMeta("property", "og:description", description);
   upsertMeta("name", "twitter:card", "summary_large_image");

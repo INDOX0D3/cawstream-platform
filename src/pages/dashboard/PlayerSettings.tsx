@@ -43,7 +43,7 @@ const PAID_PLANS = ["premium", "platinum"];
 export default function PlayerSettings() {
   const { t } = useI18n();
   const siteConfig = useQuery(api.settings.getPublicConfig);
-  const siteName = siteConfig?.site.name || "CawStream";
+  const siteName = siteConfig?.site.name || "Vidood Stream";
   const existing = useQuery(api.playerPrefs.getMyPlayerSettings);
   const update = useMutation(api.playerPrefs.updatePlayerSettings);
   const [form, setForm] = useState<PrefsForm | null>(null);

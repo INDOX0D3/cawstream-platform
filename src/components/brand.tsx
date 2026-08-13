@@ -42,7 +42,7 @@ export function Logo({
 }) {
   const config = useQuery(api.settings.getPublicConfig);
   const logoUrl = src || config?.site.logoUrl || "";
-  const name = config?.site.name || "CawStream";
+  const name = config?.site.name || "Vidood Stream";
 
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);

@@ -75,13 +75,13 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 
 export const DEFAULT_BRANDING: BrandingSettings = {
   watermarkEnabled: true,
-  watermarkText: "CawStream",
+  watermarkText: "Vidood Stream",
   watermarkLogoUrl: "",
   watermarkPosition: "top-right",
   watermarkSize: 14,
   watermarkOpacity: 0.65,
   watermarkMargin: 12,
-  brandName: "CawStream",
+  brandName: "Vidood Stream",
   brandTagline: "Video hosting & streaming",
 };
 
@@ -92,18 +92,18 @@ export const DEFAULT_SMTP: SmtpSettings = {
   username: "",
   password: "",
   encryption: "tls",
-  senderName: "CawStream",
+  senderName: "Vidood Stream",
   senderEmail: "",
   verified: false,
 };
 
 export const DEFAULT_SITE: SiteSettings = {
-  name: "CawStream",
+  name: "Vidood Stream",
   supportEmail: "",
-  metaTitle: "CawStream — Video hosting & streaming",
+  metaTitle: "Vidood Stream — Video hosting & streaming",
   metaDescription:
     "Upload, host and stream videos with a custom player, embed codes, play-button link previews and honest analytics.",
-  metaKeywords: "video hosting, video streaming, video embed, cawstream",
+  metaKeywords: "video hosting, video streaming, video embed, vidood",
   logoUrl: "",
   iconUrl: "",
 };

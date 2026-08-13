@@ -67,7 +67,7 @@ export function PricingCards({
 }) {
   const { t } = useI18n();
   const siteConfig = useQuery(api.settings.getPublicConfig);
-  const siteName = siteConfig?.site.name || "CawStream";
+  const siteName = siteConfig?.site.name || "Vidood Stream";
 
   return (
     <div

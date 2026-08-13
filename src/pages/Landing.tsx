@@ -72,7 +72,7 @@ const STATS: Array<{ icon: typeof UploadCloud; value: DictKey; label: DictKey }>
   { icon: Code2, value: "landing.stat4Value", label: "landing.stat4Label" },
 ];
 
-function PlayerMock({ siteName = "CawStream" }: { siteName?: string }) {
+function PlayerMock({ siteName = "Vidood Stream" }: { siteName?: string }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl shadow-black/40">
       {/* faux browser chrome */}
@@ -149,7 +149,7 @@ export default function Landing() {
   const { isAuthenticated } = useAuth();
   const { t } = useI18n();
 
-  const brandName = config?.branding.brandName ?? "CawStream";
+  const brandName = config?.branding.brandName ?? "Vidood Stream";
   const tagline = config?.branding.brandTagline ?? "Video hosting & streaming";
   const ctaHref = isAuthenticated ? "/dashboard" : "/auth";
 
@@ -264,7 +264,7 @@ export default function Landing() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="mx-auto mt-14 max-w-3xl"
           >
-            <PlayerMock siteName={config?.site.name || "CawStream"} />
+            <PlayerMock siteName={config?.site.name || "Vidood Stream"} />
           </motion.div>
 
           <div className="mt-10">

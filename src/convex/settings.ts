@@ -143,7 +143,7 @@ export const updateSettings = mutation({
         ...base,
         ...value,
         watermarkEnabled: Boolean(value.watermarkEnabled ?? base.watermarkEnabled),
-        watermarkText: String(value.watermarkText ?? base.watermarkText).slice(0, 60) || "CawStream",
+        watermarkText: String(value.watermarkText ?? base.watermarkText).slice(0, 60) || "Vidood Stream",
         watermarkLogoUrl: String(value.watermarkLogoUrl ?? base.watermarkLogoUrl ?? "").slice(0, 2048),
         watermarkPosition: ["top-right", "top-left", "bottom-right", "bottom-left", "center"].includes(position)
           ? position
@@ -151,7 +151,7 @@ export const updateSettings = mutation({
         watermarkSize: Math.min(96, Math.max(8, Number(value.watermarkSize ?? base.watermarkSize) || 14)),
         watermarkOpacity: Math.min(1, Math.max(0.05, Number(value.watermarkOpacity ?? base.watermarkOpacity) || 0.65)),
         watermarkMargin: Math.min(64, Math.max(0, Number(value.watermarkMargin ?? base.watermarkMargin) || 12)),
-        brandName: String(value.brandName ?? base.brandName).slice(0, 60) || "CawStream",
+        brandName: String(value.brandName ?? base.brandName).slice(0, 60) || "Vidood Stream",
         brandTagline: String(value.brandTagline ?? base.brandTagline ?? "").slice(0, 140),
       };
       await setSetting(ctx, "branding", next);
@@ -202,7 +202,7 @@ export const updateSettings = mutation({
     if (section === "site") {
       const base = (await getSetting(ctx, "site", DEFAULT_SITE)) as SiteSettings;
       const next: SiteSettings = {
-        name: String(value.name ?? base.name).slice(0, 60) || "CawStream",
+        name: String(value.name ?? base.name).slice(0, 60) || "Vidood Stream",
         supportEmail: String(value.supportEmail ?? base.supportEmail ?? "").slice(0, 255),
         metaTitle: String(value.metaTitle ?? base.metaTitle ?? "").slice(0, 160) || base.metaTitle,
         metaDescription: String(value.metaDescription ?? base.metaDescription ?? "").slice(0, 500),

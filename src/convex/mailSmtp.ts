@@ -85,7 +85,7 @@ export const sendOtp = internalAction({
   handler: async (ctx, { to, otp, appName }): Promise<SendOtpResult> => {
     const config = await ctx.runQuery(internal.mailer.getMailConfig, {});
     const smtp = config.smtp;
-    const siteName = config.site.name || "CawStream";
+    const siteName = config.site.name || "Vidood Stream";
     const name = (appName || siteName).slice(0, 60);
     const subject = `Your ${name} verification code`;
     const text = [
@@ -196,7 +196,7 @@ export const sendTestEmail = action({
       try {
         const transport = smtpTransport(smtp);
         await transport.sendMail({
-          from: `${smtp.senderName || "CawStream"} <${smtp.senderEmail}>`,
+          from: `${smtp.senderName || "Vidood Stream"} <${smtp.senderEmail}>`,
           to: recipient,
           subject,
           text,

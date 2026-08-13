@@ -82,7 +82,7 @@ async function sendVerificationRequest({
       {
         to: email,
         otp: token,
-        appName: process.env.VLY_APP_NAME || "CawStream",
+        appName: process.env.VLY_APP_NAME || "Vidood Stream",
       },
       {
         headers: {

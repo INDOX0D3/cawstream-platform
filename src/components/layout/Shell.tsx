@@ -194,7 +194,7 @@ function ShellFrame({
   const { user, signOut, isLoading } = useAuth();
   const { t } = useI18n();
   const siteConfig = useQuery(api.settings.getPublicConfig);
-  const siteName = siteConfig?.site.name || "CawStream";
+  const siteName = siteConfig?.site.name || "Vidood Stream";
   const navigate = useNavigate();
   const location = useLocation();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
