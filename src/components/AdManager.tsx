@@ -385,6 +385,12 @@ export function AdManager({
             node.style.setProperty("position", "relative", "important");
             node.style.setProperty("inset", "auto", "important");
             node.style.setProperty("max-width", "100%", "important");
+            // Cap the banner's height so it can never cover the center of
+            // the video where the big play button lives — even if the
+            // snippet inserts an oversized/full-screen element, it stays a
+            // compact corner banner and the player stays clickable.
+            node.style.setProperty("max-height", "30%", "important");
+            node.style.setProperty("overflow", "hidden", "important");
           } catch {
             /* ignore */
           }
