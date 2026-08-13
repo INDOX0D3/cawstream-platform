@@ -3,15 +3,17 @@
  *
  * Ads are user-configured (dashboard → Advertisements) and resolved on the
  * server from VIDEO → OWNER → USER AD SETTINGS (see src/convex/ads.ts). This
- * component only *runs* them inside the public player/embed context.
+ * component only *runs* them inside the public player/embed context — the
+ * ads belong to the video player page, never to the rest of the site.
  *
- * Placement follows the ad network's instructions:
- *  - Popunder: the owner's snippet is injected right before </head> (the
- *    network script creates the popunder itself, usually on page load).
- *    "Use one popunder per page" is enforced with a one-per-page marker.
- *  - Social bar: the owner's snippet is rendered right above </body> — a
- *    full page-level banner (usually a fixed bottom bar), not an iframe, so
- *    the network's own styling/scripts behave exactly as intended.
+ * Placement:
+ *  - Popunder: the owner's snippet is injected right before </head> (per the
+ *    ad network's instruction — "use one popunder per page"). It fires while
+ *    the player page is open (usually on first interaction, which is what
+ *    browsers allow), and every window it opens is tracked.
+ *  - Social bar: the owner's snippet is rendered INSIDE the video player as a
+ *    bottom overlay (above the player controls), so the ad banner is attached
+ *    to the video itself — not floating on the page outside the video.
  *  - Smartlink: plain click-based https:// redirect with the opener detached.
  *
  * Lifecycle — ads belong to the player page only:
@@ -21,16 +23,22 @@
  * that impossible:
  *
  *  1. window.open is patched once at module load (it is never called anywhere
- *     else in this app). While at least one player page is mounted it strips
- *     `noopener`/`noreferrer` from the features string — otherwise the ad
- *     script opens a window with no handle and we could never close it — and
- *     records every window it opens. When NO player page is mounted it
+ *     else in this app). While at least one player page with ads is mounted it
+ *     strips `noopener`/`noreferrer` from the features string — otherwise the
+ *     ad script opens a window with no handle and we could never close it —
+ *     and records every window it opens. When NO player page is mounted it
  *     returns null without opening anything, so a setTimeout or event
  *     listener left behind by the ad snippet can never pop a window on the
  *     dashboard.
  *  2. On unmount (route change) and on pagehide (full unload) every tracked
  *     popunder window is closed and the injected script is removed, so ads
  *     stop immediately and the next player page starts with fresh ads.
+ *
+ * The guard counter deliberately counts "a player page with ads is mounted",
+ * NOT "a snippet was injected on this exact mount". That keeps it correct
+ * under React StrictMode (dev double-mount + HMR): a snippet injected on a
+ * previous mount may leave listeners behind — those listeners are allowed to
+ * fire while the player page is open, and are blocked the moment it closes.
  *
  * The smartlink deliberately uses the pristine window.open captured at module
  * load, so a tab the user clicked on purpose is never tracked or force-closed.
@@ -119,8 +127,8 @@ const REAL_OPEN = typeof window !== "undefined" ? window.open.bind(window) : nul
 /**
  * Module-level ad lifecycle.
  *
- * - `playerPageCount` — how many player pages (popunder and/or social bar)
- *   are currently mounted. Ads may only open windows while this is > 0.
+ * - `playerPageCount` — how many player pages with ads are currently mounted.
+ *   Ads may only open windows while this is > 0.
  * - `trackedWindows` — every window the ad snippet opened while a player page
  *   was mounted. All of them are closed on unmount / pagehide.
  *
@@ -203,18 +211,30 @@ export function AdManager({
   const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
   const socialOn = ads.socialBarEnabled && ads.socialBarCode;
 
+  // Guard counter — StrictMode-safe and independent of session gating. It
+  // counts "a player page with ads is mounted", so snippets (and the
+  // listeners they leave behind, e.g. after a StrictMode remount or HMR) are
+  // allowed to open windows while the player page is open, and blocked the
+  // moment it closes. Must be declared before the ad effects below so the
+  // counter is already > 0 when a snippet runs synchronously on injection.
+  useEffect(() => {
+    if (!popunderOn && !socialOn) return;
+    playerPageCount += 1;
+    return () => {
+      playerPageCount = Math.max(0, playerPageCount - 1);
+    };
+  }, [popunderOn, socialOn]);
+
   // Popunder — the network snippet is injected before </head> (per the ad
-  // network's instruction). While this player page is mounted every window
-  // the snippet opens is tracked by the module-level guard; on unmount
-  // (route change) the script is removed, the guard stops allowing any
-  // further opens, and all tracked popunders are closed — ads can never leak
-  // into the dashboard or any other page.
+  // network's instruction). It fires while this player page is open; every
+  // window it opens is tracked by the module-level guard. On unmount (route
+  // change) the script is removed, the guard stops allowing any further
+  // opens, and all tracked popunders are closed — ads can never leak into
+  // the dashboard or any other page.
   useEffect(() => {
     if (!popunderOn) return;
     const always = ads.frequency === "always";
     if (!always && sessionFired(popunderKey(ads.popunderCode))) return;
-
-    playerPageCount += 1;
 
     document.getElementById("cawstream-popunder")?.remove();
     const script = document.createElement("script");
@@ -229,32 +249,38 @@ export function AdManager({
     window.addEventListener("pagehide", closeAll);
 
     return () => {
-      playerPageCount = Math.max(0, playerPageCount - 1);
       window.removeEventListener("pagehide", closeAll);
       document.getElementById("cawstream-popunder")?.remove();
       closeAllPopunders();
     };
   }, [popunderOn, ads.popunderCode, ads.frequency]);
 
-  // Social bar — inserted right above </body> per the ad network's
-  // instruction: a page-level fixed banner at the bottom of the viewport,
-  // so the network's own styling/scripts behave exactly as intended. The bar
-  // is removed on unmount and its windows are covered by the same guard.
+  // Social bar — rendered INSIDE the video player as a bottom overlay, so
+  // the banner is attached to the video itself ("ads inside the player"),
+  // not floating on the page outside the video. The host div carries a
+  // transform, which makes any position:fixed elements inside the network's
+  // snippet position relative to the player instead of the viewport. On the
+  // embed page the player fills the screen, so the bar sits at the bottom of
+  // the screen there; on the watch page it sits at the bottom of the video.
   useEffect(() => {
     if (!socialOn) return;
     if (document.getElementById("cawstream-social-bar")) return;
-    playerPageCount += 1;
+    const host = containerRef.current ?? document.body;
     const bar = document.createElement("div");
     bar.id = "cawstream-social-bar";
     bar.style.cssText =
-      "position:fixed;left:0;right:0;bottom:0;z-index:9000;pointer-events:auto;";
-    document.body.appendChild(bar);
+      "position:absolute;inset:auto 0 0 0;display:flex;flex-direction:column;" +
+      "justify-content:flex-end;max-height:100%;overflow:hidden;z-index:9000;" +
+      "pointer-events:auto;transform:translateZ(0);";
+    // Clicks on the ad banner must not pause/play the player underneath.
+    bar.addEventListener("click", (e) => e.stopPropagation());
+    bar.addEventListener("pointerdown", (e) => e.stopPropagation());
+    host.appendChild(bar);
     runCodeIn(bar, ads.socialBarCode);
     return () => {
-      playerPageCount = Math.max(0, playerPageCount - 1);
       bar.remove();
     };
-  }, [socialOn, ads.socialBarCode]);
+  }, [socialOn, ads.socialBarCode, containerRef]);
 
   // Smartlink — fires on clicks inside the player. Uses the pristine
   // window.open so its tab is a deliberate user action and is never tracked
