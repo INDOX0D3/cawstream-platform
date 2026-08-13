@@ -344,12 +344,32 @@ export function AdManager({
     bar.style.cssText =
       "position:absolute;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column;" +
       `justify-content:${justify};align-items:flex-start;width:100%;min-width:0;` +
-      "overflow:hidden;z-index:9000;pointer-events:auto;transform:translateZ(0);";
-    // Clicks on the ad banner must not pause/play the player underneath.
+      // The host spans the whole player (so the network's fixed-position
+      // banner is contained and never collides with the layout) but must be
+      // click-transparent — only the banner content inside it is clickable,
+      // otherwise this invisible layer would block the play button and all
+      // player controls.
+      "overflow:hidden;z-index:9000;pointer-events:none;transform:translateZ(0);";
+    // Clicks on the ad banner must not pause/play the player underneath
+    // (events from the clickable banner still bubble through this host).
     bar.addEventListener("click", (e) => e.stopPropagation());
     bar.addEventListener("pointerdown", (e) => e.stopPropagation());
+    // The host itself is click-transparent; make every banner element inside
+    // it clickable again.
+    const enableBarClicks = () => {
+      bar.querySelectorAll("*").forEach((el) => {
+        if (el instanceof HTMLElement) {
+          try {
+            el.style.setProperty("pointer-events", "auto", "important");
+          } catch {
+            /* ignore */
+          }
+        }
+      });
+    };
     host.appendChild(bar);
     runSnippet(bar, ads.socialBarCode);
+    enableBarClicks();
 
     // Catch the banner the snippet injects into <body> and move it into the
     // in-player host, forcing it back into normal flow so it sits on the
@@ -369,6 +389,7 @@ export function AdManager({
             /* ignore */
           }
           bar.appendChild(node);
+          enableBarClicks();
         }
       }
     });
