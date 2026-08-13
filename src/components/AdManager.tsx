@@ -180,25 +180,73 @@ function closeAllPopunders(): void {
 }
 
 /**
- * Render arbitrary ad HTML + run its scripts inside a host element. Scripts
- * are re-created so they actually execute (innerHTML alone does not run them).
+ * Execute an ad snippet the way the network intended, tolerating every shape
+ * publishers actually paste:
+ *  - full HTML with <script> tags (the format Adsterra/PopAds hand out),
+ *  - bare JavaScript,
+ *  - document.write() based code — intercepted and redirected into the host
+ *    so a legacy snippet can never wipe this SPA, and its output still runs.
+ * Scripts are re-created so they actually execute (innerHTML alone does not
+ * run them); external scripts are loaded async so a slow network can never
+ * block the player.
  */
-function runCodeIn(host: HTMLElement, code: string): void {
+function runSnippet(host: HTMLElement, code: string): void {
+  const source = String(code ?? "");
+  if (!source.trim()) return;
+
+  // Temporarily capture document.write/writeln output into a buffer and
+  // append it to the host afterwards — never into the live document.
+  const doc = document as unknown as {
+    write: (...text: string[]) => void;
+    writeln: (...text: string[]) => void;
+  };
+  const origWrite = document.write.bind(document);
+  const origWriteln = document.writeln.bind(document);
+  const written: string[] = [];
+  doc.write = (...text: string[]) => written.push(text.join(""));
+  doc.writeln = (...text: string[]) => written.push(text.join("") + "\n");
+
   try {
-    host.innerHTML = code;
-    const scripts = Array.from(host.querySelectorAll("script"));
-    for (const old of scripts) {
-      const fresh = document.createElement("script");
-      if (old.src) {
-        fresh.src = old.src;
-        fresh.async = true;
-      } else {
-        fresh.textContent = old.textContent;
+    if (/<script[\s>]/i.test(source)) {
+      host.innerHTML = source;
+      const scripts = Array.from(host.querySelectorAll("script"));
+      for (const old of scripts) {
+        const fresh = document.createElement("script");
+        if (old.src) {
+          fresh.src = old.src;
+          fresh.async = true;
+        } else {
+          fresh.textContent = old.textContent;
+        }
+        old.parentNode?.replaceChild(fresh, old);
       }
-      old.parentNode?.replaceChild(fresh, old);
+    } else {
+      const script = document.createElement("script");
+      script.textContent = source;
+      host.appendChild(script);
     }
   } catch {
     /* ad code must never break the player */
+  } finally {
+    doc.write = origWrite;
+    doc.writeln = origWriteln;
+    // Any document.write output from the snippet renders inside the host.
+    if (written.length > 0) {
+      const div = document.createElement("div");
+      div.innerHTML = written.join("");
+      host.appendChild(div);
+      const scripts = Array.from(div.querySelectorAll("script"));
+      for (const old of scripts) {
+        const fresh = document.createElement("script");
+        if (old.src) {
+          fresh.src = old.src;
+          fresh.async = true;
+        } else {
+          fresh.textContent = old.textContent;
+        }
+        old.parentNode?.replaceChild(fresh, old);
+      }
+    }
   }
 }
 
@@ -231,22 +279,23 @@ export function AdManager({
     };
   }, [popunderOn, socialOn]);
 
-  // Popunder — the network snippet is injected before </head> (per the ad
-  // network's instruction). It fires while this player page is open; every
-  // window it opens is tracked by the module-level guard. On unmount (route
-  // change) the script is removed, the guard stops allowing any further
-  // opens, and all tracked popunders are closed — ads can never leak into
-  // the dashboard or any other page.
+  // Popunder — the network snippet runs in a hidden host inside <head> (per
+  // the ad network's instruction — "paste before </head>"). It fires while
+  // this player page is open; every window it opens is tracked by the
+  // module-level guard. On unmount (route change) the host is removed, the
+  // guard stops allowing any further opens, and all tracked popunders are
+  // closed — ads can never leak into the dashboard or any other page.
   useEffect(() => {
     if (!popunderOn) return;
     const always = ads.frequency === "always";
     if (!always && sessionFired(popunderKey(ads.popunderCode))) return;
 
     document.getElementById("cawstream-popunder")?.remove();
-    const script = document.createElement("script");
-    script.id = "cawstream-popunder";
-    script.textContent = ads.popunderCode;
-    document.head.appendChild(script);
+    const host = document.createElement("div");
+    host.id = "cawstream-popunder";
+    host.style.display = "none";
+    document.head.appendChild(host);
+    runSnippet(host, ads.popunderCode);
     if (!always) markSessionFired(popunderKey(ads.popunderCode));
 
     const closeAll = () => closeAllPopunders();
@@ -296,7 +345,7 @@ export function AdManager({
     bar.addEventListener("click", (e) => e.stopPropagation());
     bar.addEventListener("pointerdown", (e) => e.stopPropagation());
     host.appendChild(bar);
-    runCodeIn(bar, ads.socialBarCode);
+    runSnippet(bar, ads.socialBarCode);
 
     // Catch the banner the snippet injects into <body> and move it into the
     // in-player host, forcing it back into normal flow so it sits on the
