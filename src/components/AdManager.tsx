@@ -3,33 +3,29 @@
  *
  * Ads are user-configured (dashboard → Advertisements) and resolved on the
  * server from VIDEO → OWNER → USER AD SETTINGS (see src/convex/ads.ts). This
- * component only *renders* them inside the public player/embed context.
+ * component only *runs* them inside the public player/embed context.
+ *
+ * Placement follows the ad network's instructions:
+ *  - Popunder: the owner's snippet is injected right before </head> (the
+ *    network script creates the popunder itself, usually on page load).
+ *    "Use one popunder per page" is enforced with a one-per-page marker.
+ *  - Social bar: the owner's snippet is rendered right above </body> — a
+ *    full page-level banner (usually a fixed bottom bar), not an iframe, so
+ *    the network's own styling/scripts behave exactly as intended.
+ *  - Smartlink: plain click-based https:// redirect with the opener detached.
  *
  * Frequency (set per user in Advertisements):
- *  - "session" (default): smartlink + popunder fire at most once per browsing
- *    session (sessionStorage).
- *  - "always": they fire on every click anywhere in the player screen, on the
- *    watch page and the embed alike.
- * In both modes the Social Bar banner stays visible continuously while enabled.
+ *  - "session" (default): popunder fires once per browsing session
+ *    (sessionStorage); smartlink once per session on the first click.
+ *  - "always": popunder fires on every page load; smartlink fires on every
+ *    click anywhere in the player screen (watch page and embed alike).
+ * The Social Bar banner stays visible continuously while enabled.
  *
- * Why popunder and smartlink fire on separate events:
- *  Most browsers only let ONE popup through per user gesture. Firing both on
- *  the same `pointerdown` meant the second window.open (the popunder) was
- *  silently blocked — the exact "only the redirect works" symptom. So the
- *  popunder fires on `pointerdown` (the first popup of the gesture) and the
- *  smartlink on the subsequent `click`. If a popup is still blocked, it is
- *  NOT marked as fired and simply retries on the next gesture.
- *
- * Isolation rules:
- *  - Social Bar code runs inside a sandboxed iframe (sandbox="allow-scripts")
- *    so it can never touch the app DOM, cookies or session.
- *  - Popunder code runs in a fresh popup window whose `opener` is detached
- *    immediately, never inside the app.
- *  - Smartlink is a plain https:// link opened with the opener detached.
- *  - Nothing here is ever rendered on dashboard, admin or auth pages.
+ * Isolation note: the ad code runs in the page context exactly as the network
+ * requires, so it can only be configured by the video owner (server-resolved).
+ * It is never rendered on dashboard, admin or auth pages.
  */
 import { useEffect } from "react";
-import { cn } from "@/lib/utils";
 
 export type AdFrequency = "session" | "always";
 
@@ -40,7 +36,7 @@ export interface AdsConfig {
   socialBarCode: string;
   popunderEnabled: boolean;
   popunderCode: string;
-  /** "session" = once per browsing session (default), "always" = every click. */
+  /** "session" = once per browsing session (default), "always" = every click/load. */
   frequency: AdFrequency;
 }
 
@@ -92,90 +88,96 @@ function markSessionFired(key: string): void {
 const smartlinkKey = (url: string) => `cawstream:ad:smartlink:${url}`;
 const popunderKey = (code: string) => `cawstream:ad:popunder:${hashCode(code)}`;
 
-/** Build a self-contained sandbox document for a social-bar ad code. */
-function buildSocialBarDoc(code: string): string {
-  const json = JSON.stringify(code).replace(/<\/script/gi, "<\\/script");
-  return [
-    "<!doctype html><html><head><style>",
-    "html,body{margin:0;padding:0;background:transparent;overflow:hidden}",
-    "#caw-slot{width:100%;height:100%}",
-    "</style></head><body>",
-    '<div id="caw-slot"></div>',
-    "<script>",
-    "(function(){",
-    "try{",
-    `var raw=${json};`,
-    'var el=document.getElementById("caw-slot");',
-    "el.innerHTML=raw;",
-    "var scripts=el.querySelectorAll('script');",
-    "for(var i=0;i<scripts.length;i++){",
-    "var s=scripts[i];var ns=document.createElement('script');",
-    "if(s.src){ns.src=s.src;}else{ns.textContent=s.textContent;}",
-    "s.parentNode.replaceChild(ns,s);",
-    "}",
-    "}catch(e){}",
-    "})();",
-    "</script></body></html>",
-  ].join("");
+/**
+ * Inject an inline script right before </head>. Executes synchronously, just
+ * like the network's "paste before </head>" instruction. A fixed marker id
+ * enforces one popunder per page.
+ */
+function injectHeadScript(code: string): boolean {
+  if (document.getElementById("cawstream-popunder")) return false; // one per page
+  try {
+    const script = document.createElement("script");
+    script.id = "cawstream-popunder";
+    script.textContent = code;
+    document.head.appendChild(script);
+    return true;
+  } catch {
+    return false; // ad code must never break the player
+  }
 }
 
 /**
- * Popunder: fresh popup window, ad code runs there, opener detached.
- * Returns true when the popup actually opened (not blocked by the browser).
+ * Render arbitrary ad HTML + run its scripts inside a host element. Scripts
+ * are re-created so they actually execute (innerHTML alone does not run them).
  */
-function openPopunder(code: string): boolean {
+function runCodeIn(host: HTMLElement, code: string): void {
   try {
-    const win = window.open("about:blank", "_blank", "width=420,height=640");
-    if (!win) return false;
-    win.document.write(
-      "<!doctype html><html><head><meta charset='utf-8'><title>Advertisement</title></head><body style='margin:0'>",
-    );
-    win.document.write(code);
-    win.document.write("</body></html>");
-    win.document.close();
-    try {
-      win.opener = null;
-    } catch {
-      /* ignore */
+    host.innerHTML = code;
+    const scripts = Array.from(host.querySelectorAll("script"));
+    for (const old of scripts) {
+      const fresh = document.createElement("script");
+      if (old.src) {
+        fresh.src = old.src;
+        fresh.async = true;
+      } else {
+        fresh.textContent = old.textContent;
+      }
+      old.parentNode?.replaceChild(fresh, old);
     }
-    return true;
   } catch {
-    /* popup blocked or failed — never break playback */
-    return false;
+    /* ad code must never break the player */
   }
 }
 
 export function AdManager({
   ads,
   containerRef,
-  className,
 }: {
   ads: AdsConfig;
   containerRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
 }) {
-  // Smartlink + popunder. Each popup gets its own user gesture so the browser
-  // popup blocker can't drop the second one (see module comment). A blocked
-  // popup is never marked as fired, so it retries on the next gesture.
-  useEffect(() => {
-    const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
-    const popunderOn = ads.popunderEnabled && ads.popunderCode;
-    if (!smartlinkOn && !popunderOn) return;
+  const popunderOn = ads.popunderEnabled && ads.popunderCode;
+  const smartlinkOn = ads.smartlinkEnabled && isValidSmartlink(ads.smartlinkUrl);
+  const socialOn = ads.socialBarEnabled && ads.socialBarCode;
 
+  // Popunder — network snippet injected before </head> per the ad network's
+  // instructions; the script creates the popunder itself (usually on load).
+  useEffect(() => {
+    if (!popunderOn) return;
+    const always = ads.frequency === "always";
+    if (!always && sessionFired(popunderKey(ads.popunderCode))) return;
+    if (injectHeadScript(ads.popunderCode) && !always) {
+      markSessionFired(popunderKey(ads.popunderCode));
+    }
+  }, [popunderOn, ads.popunderCode, ads.frequency]);
+
+  // Social bar — inserted right above </body> per the ad network's
+  // instruction: a page-level fixed banner at the bottom of the viewport,
+  // so the network's own styling/scripts behave exactly as intended.
+  useEffect(() => {
+    if (!socialOn) return;
+    if (document.getElementById("cawstream-social-bar")) return;
+    const bar = document.createElement("div");
+    bar.id = "cawstream-social-bar";
+    bar.style.cssText =
+      "position:fixed;left:0;right:0;bottom:0;z-index:9000;pointer-events:auto;";
+    document.body.appendChild(bar);
+    runCodeIn(bar, ads.socialBarCode);
+    return () => {
+      bar.remove();
+    };
+  }, [socialOn, ads.socialBarCode]);
+
+  // Smartlink — fires on clicks inside the player. If the popup is blocked
+  // by the browser it is NOT marked as fired, so it retries on the next
+  // gesture instead of being silently lost.
+  useEffect(() => {
+    if (!smartlinkOn) return;
     const el = containerRef.current;
     if (!el) return;
 
-    const firePopunder = () => {
-      if (!popunderOn) return;
-      const always = ads.frequency === "always";
-      if (!always && sessionFired(popunderKey(ads.popunderCode))) return;
-      if (openPopunder(ads.popunderCode) && !always) {
-        markSessionFired(popunderKey(ads.popunderCode));
-      }
-    };
-
     const fireSmartlink = () => {
-      if (!smartlinkOn) return;
       const always = ads.frequency === "always";
       if (!always && sessionFired(smartlinkKey(ads.smartlinkUrl))) return;
       const win = window.open(ads.smartlinkUrl, "_blank");
@@ -190,38 +192,9 @@ export function AdManager({
       // Blocked (null) → not marked as fired → retried on the next gesture.
     };
 
-    const onPointerDown = () => firePopunder();
-    const onClick = () => fireSmartlink();
+    el.addEventListener("click", fireSmartlink);
+    return () => el.removeEventListener("click", fireSmartlink);
+  }, [smartlinkOn, ads.smartlinkUrl, ads.frequency, containerRef]);
 
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("click", onClick);
-    return () => {
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("click", onClick);
-    };
-  }, [
-    ads.smartlinkEnabled,
-    ads.smartlinkUrl,
-    ads.popunderEnabled,
-    ads.popunderCode,
-    ads.frequency,
-    containerRef,
-  ]);
-
-  const socialVisible = ads.socialBarEnabled && ads.socialBarCode;
-
-  if (!socialVisible) return null;
-
-  return (
-    <div className={cn("absolute inset-x-0 top-0 z-40", className)}>
-      <div className="relative h-14 w-full border-b border-white/10 bg-black/40">
-        <iframe
-          title="Advertisement"
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-          srcDoc={buildSocialBarDoc(ads.socialBarCode)}
-          className="h-full w-full border-0"
-        />
-      </div>
-    </div>
-  );
+  return null;
 }
