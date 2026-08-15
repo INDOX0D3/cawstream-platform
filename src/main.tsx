@@ -4,14 +4,14 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { AdminShell, AppShell } from "@/components/layout/Shell";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient, useQuery } from "convex/react";
+import { AuthProvider } from "@/hooks/use-api";
+import { useApiQuery } from "@/hooks/use-api";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { I18nProvider } from "@/lib/i18n";
 import { applySiteMeta } from "@/lib/seo";
-import { api } from "@/convex/_generated/api";
+import type { PublicConfig } from "@/lib/types";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -102,14 +102,10 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
-
-
-
 /** Keeps the document <head> in sync with the site-wide SEO settings
  *  (title, description, keywords, favicon/logo) from Admin → Branding. */
 function SiteMetaSyncer() {
-  const config = useQuery(api.settings.getPublicConfig);
+  const config = useApiQuery<PublicConfig>("settings/getPublicConfig");
   useEffect(() => {
     if (!config) return;
     applySiteMeta({
@@ -154,7 +150,7 @@ createRoot(document.getElementById("root")!).render(
       <ToolbarErrorBoundary>
         <VlyToolbar />
       </ToolbarErrorBoundary>
-      <ConvexAuthProvider client={convex}>
+      <AuthProvider>
         <I18nProvider>
           <SiteMetaSyncer />
           <BrowserRouter>
@@ -210,7 +206,7 @@ createRoot(document.getElementById("root")!).render(
         </BrowserRouter>
         </I18nProvider>
         <Toaster />
-      </ConvexAuthProvider>
+      </AuthProvider>
     </RootErrorBoundary>
   </StrictMode>,
 );

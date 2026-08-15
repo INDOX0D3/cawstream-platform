@@ -23,13 +23,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { videoUrls } from "@/lib/embed";
 import { formatBytes, formatCompact, formatDateTime, formatDuration } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { extractMetadata, generateSocialThumbnail, generateThumbnail, uploadBlob } from "@/lib/video";
-import { useMutation, useQuery } from "convex/react";
-import type { Id } from "@/convex/_generated/dataModel";
+import {
+  completeVideoUpload,
+  extractMetadata,
+  generateSocialThumbnail,
+  generateThumbnail,
+} from "@/lib/video";
+import type { VideoDetail, VideoItem } from "@/lib/types";
 import {
   BarChart3,
   Clapperboard,
@@ -53,8 +57,7 @@ import {
   YAxis,
 } from "recharts";
 
-type VideoRow = NonNullable<ReturnType<typeof useQuery<typeof api.videos.listMine>>>[number];
-type VideoDetail = NonNullable<ReturnType<typeof useQuery<typeof api.videos.getMine>>>;
+type VideoRow = VideoItem;
 
 const FILTERS = ["all", "ready", "processing", "failed"] as const;
 
@@ -62,7 +65,10 @@ export default function Videos() {
   const { t } = useI18n();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [selected, setSelected] = useState<VideoRow | null>(null);
-  const videos = useQuery(api.videos.listMine, { status: filter === "all" ? undefined : filter });
+  const videos = useApiQuery<VideoItem[]>(
+    "videos/listMine",
+    filter === "all" ? {} : { status: filter },
+  );
 
   const filtered = videos?.filter((v: VideoRow) =>
     filter === "all"
@@ -142,15 +148,13 @@ function VideoDetailDialog({
 }) {
   const { t } = useI18n();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const detail: VideoDetail | undefined = useQuery(api.videos.getMine, {
+  const detail: VideoDetail | undefined = useApiQuery<VideoDetail>("videos/getMine", {
     videoId: video._id,
   });
-  const updateVideo = useMutation(api.videos.updateVideo);
-  const deleteVideo = useMutation(api.videos.deleteVideo);
-  const reprocess = useMutation(api.videos.reprocess);
-  const markFailed = useMutation(api.videos.markFailed);
-  const getUploadUrl = useMutation(api.videos.getUploadUrl);
-  const completeProcessing = useMutation(api.videos.completeProcessing);
+  const updateVideo = useApiMutation("videos/updateVideo");
+  const deleteVideo = useApiMutation("videos/deleteVideo");
+  const reprocess = useApiMutation<{ videoId: string }, { url: string }>("videos/reprocess");
+  const markFailed = useApiMutation("videos/markFailed");
 
   const [title, setTitle] = useState(video.title);
   const [description, setDescription] = useState(video.description ?? "");
@@ -195,32 +199,28 @@ function VideoDetailDialog({
       const res = await fetch(url);
       if (!res.ok) throw new Error("Could not download the stored file.");
       const blob = await res.blob();
-      const meta = await extractMetadata(blob as File);
-      let thumbnailStorageId: Id<"_storage"> | undefined;
+      const file = new File([blob], video.fileName, { type: video.mimeType });
+      const meta = await extractMetadata(file);
+      let thumbnail: Blob | null = null;
+      let social: Blob | null = null;
       try {
-        const thumb = await generateThumbnail(blob as File);
-        const thumbUrl = await getUploadUrl();
-        thumbnailStorageId = (await uploadBlob(thumbUrl, thumb)) as Id<"_storage">;
+        thumbnail = await generateThumbnail(file);
       } catch {
         // a thumbnail is optional — the video can still be marked ready
       }
-      let socialThumbnailStorageId: Id<"_storage"> | undefined;
       try {
-        const social = await generateSocialThumbnail(blob as File);
-        const socialUrl = await getUploadUrl();
-        socialThumbnailStorageId = (await uploadBlob(socialUrl, social)) as Id<"_storage">;
+        social = await generateSocialThumbnail(file);
       } catch {
         // the play-button poster is optional too
       }
-      await completeProcessing({
-        videoId: video._id,
-        thumbnailStorageId,
-        socialThumbnailStorageId,
+      await completeVideoUpload(video._id, {
         duration: meta.duration,
         width: meta.width,
         height: meta.height,
         codec: meta.codec,
         bitrate: meta.bitrate,
+        thumbnail,
+        socialThumbnail: social,
       });
       toast.success(t("videos.reprocessed"));
       onClose();

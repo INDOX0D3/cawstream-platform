@@ -1,209 +1,162 @@
-# Deploy CawStream di VPS (tetap pakai Convex)
+# Deploy Vidood Stream di VPS (tanpa Convex — backend sendiri)
 
-Aplikasi ini terdiri dari **2 bagian**:
+Aplikasi ini **sepenuhnya self-hosted** — tidak ada Convex, tidak ada backend pihak
+ketiga. Semuanya jalan di VPS kamu:
 
-| Bagian | Apa itu | Di-host di mana |
+| Bagian | Teknologi | Di-host di mana |
 |---|---|---|
-| **Frontend** | React/Vite (statis) — landing, dashboard, player, admin | **VPS kamu** (nginx/Docker) |
-| **Backend + database + penyimpanan file** | Convex (fungsi, DB, auth, storage video) | **Convex Cloud** (managed) |
+| **Frontend** | React/Vite (statis, hasil build ke `dist/`) | VPS (dilayani server Bun) |
+| **Backend (API)** | Hono (Bun) — auth, OTP, video, ads, statistik, admin | VPS |
+| **Database** | SQLite (`cawstream.db`) | VPS |
+| **Penyimpanan video/thumbnail/logo** | File di disk VPS (`storage/`) | VPS |
+| **Email OTP** | SMTP milikmu (Admin → SMTP) + fallback log | VPS |
 
-Jadi di VPS kamu **tidak perlu database/backend sendiri** — VPS cukup menyajikan file statis hasil build, sementara semua logika (akun, upload, statistik, iklan, watermark) tetap jalan di Convex. Ini jalur paling cepat & aman; semua fitur tetap berfungsi seperti di Freebuff.
-
----
-
-## 0. Prasyarat
-
-- **VPS** Ubuntu/Debian (min. 1 GB RAM, 20 GB disk) dengan akses root/SSH.
-- **Domain** (opsional tapi disarankan, untuk HTTPS & preview link).
-- **Akun Convex** gratis di <https://dashboard.convex.dev> (free tier cukup untuk memulai; pakai Production plan kalau mau production).
+Satu proses saja yang jalan: `bun run server/index.ts` (default port **8787**).
+Proses ini sekaligus menyajikan frontend statis, API JSON, dan video (dengan
+dukungan HTTP Range untuk seek). nginx di depannya hanya reverse-proxy + HTTPS.
 
 ---
 
-## 1. Buat project Convex & ambil URL deployment
+## 1. Prasyarat
 
-1. Login ke <https://dashboard.convex.dev>.
-2. **Create project** → pilih nama (mis. `cawstream`), region bebas.
-3. Buka project → **Deployments**. Di sana ada **Deployment URL**, bentuknya:
-   `https://nama-hewan-123.convex.cloud`
-4. Catat **deployment name**-nya (bagian `nama-hewan-123`).
-
-> Deployment URL ini yang akan diisi ke `VITE_CONVEX_URL` saat build frontend.
+- **VPS** Ubuntu/Debian (min. 1 GB RAM, 20 GB disk; tambah disk sesuai kebutuhan
+  video — semua file video tersimpan di disk VPS).
+- **Bun** runtime (script instal di bawah).
+- **Domain** (disarankan, untuk HTTPS & preview link).
 
 ---
 
-## 2. Siapkan env & konfigurasi Convex
-
-Di folder proyek:
-
-```bash
-cp deploy/env.example .env
-nano .env
-```
-
-Isi minimal:
-
-```bash
-VITE_CONVEX_URL=https://nama-hewan-123.convex.cloud
-CONVEX_DEPLOYMENT=nama-hewan-123
-```
-
-Juga buat `convex.json` (template: `convex.json.example`) **atau** cukup pakai `CONVEX_DEPLOYMENT` di `.env` — salah satu sudah cukup untuk `bunx convex deploy`.
-
-**Server-side env (lewat dashboard Convex, bukan file .env):**
-Buka project Convex → **Settings → Environment variables**, tambahkan:
-
-| Nama | Nilai | Fungsi |
-|---|---|---|
-| `CONVEX_SITE_URL` | **JANGAN di-set** (biarkan otomatis) — atau set ke `https://nama-hewan-123.convex.site` | Dipakai backend untuk route HTTP (OTP email) dan validasi token auth |
-| `FREEBUFF_RELAY_URL` / `FREEBUFF_RELAY_KEY` | (opsional) | Relay email cadangan kalau SMTP belum dikonfigurasi |
-
-> ⚠️ **PENTING — `CONVEX_SITE_URL` jangan pernah di-set ke `.convex.cloud` dan jangan ke domain VPS.**
-> Convex **otomatis** mengisi `CONVEX_SITE_URL` dengan site URL deployment: `https://nama-hewan-123.convex.site`
-> (dokumentasi resmi: *system environment variables, always available*). Route HTTP Convex
-> (`/api/send-otp`) dan `/.well-known/openid-configuration` **hanya hidup di site URL (`.convex.site`)**,
-> bukan di `.convex.cloud` (404) dan bukan di nginx VPS (index.html).
->
-> Kalau variabel ini di-override dengan nilai yang salah, dua hal kritis rusak:
-> 1. **Kirim email OTP** → POST ke `${CONVEX_SITE_URL}/api/send-otp` → 404 → email tidak terkirim.
-> 2. **Validasi token login** → fetch `${CONVEX_SITE_URL}/.well-known/openid-configuration` → 404 →
->    token tidak pernah valid → **sign-in stuck tanpa error**.
->
-> **Solusi: hapus `CONVEX_SITE_URL` dari dashboard Convex** (pakai default otomatis `.convex.site`),
-> atau kalau mau eksplisit set ke `https://nama-hewan-123.convex.site`. Setelah mengubah env, tidak
-> perlu redeploy — langsung berlaku.
-
----
-
-## 3. Deploy backend (fungsi Convex)
-
-Dari folder proyek (di VPS atau di laptop kamu):
-
-```bash
-bun install
-bunx convex deploy
-```
-
-Ini mengunggah semua fungsi di `src/convex/` (auth, upload, video, ads, setting, email, watermark, dll) ke deployment Convex-mu.
-
-> Setiap kali ada perubahan di `src/convex/`, jalankan ulang `bunx convex deploy`.
-
----
-
-## 4. Build frontend
-
-```bash
-bun run build
-```
-
-Hasil build ada di folder `dist/` — **statis murni**, siap disajikan. Build ini sudah "menanam" `VITE_CONVEX_URL` ke dalam bundle, jadi pastikan `.env` sudah benar sebelum build.
-
----
-
-## 5. Jalankan di VPS
-
-### Opsi A — Docker (paling gampang, disarankan)
-
-```bash
-# di folder proyek, pastikan .env sudah berisi VITE_CONVEX_URL
-docker compose up -d --build
-```
-
-Aplikasi langsung live di port 80. Untuk produksi, pasang reverse proxy nginx + HTTPS (lihat Opsi B untuk file nginx).
-
-### Opsi B — nginx bare-metal (tanpa Docker)
-
-```bash
-sudo cp -r dist /var/www/cawstream
-sudo cp deploy/nginx-site.conf /etc/nginx/sites-available/cawstream
-# ganti "example.com" dengan domain kamu di deploy/nginx-site.conf
-sudo ln -s /etc/nginx/sites-available/cawstream /etc/nginx/sites-enabled/cawstream
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-**HTTPS (certbot):**
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d domainkamu.com --redirect
-```
-
-### Opsi C — script sekali jalan
+## 2. Install & setup sekali jalan
 
 ```bash
 sudo bash deploy/vps-install.sh
 ```
 
-Script menginstal Bun + nginx (+ Docker opsional), deploy Convex, build, dan memasang semuanya.
-
----
-
-## 6. Konfigurasi di dalam aplikasi (setelah live)
-
-1. **Daftar akun pertama** → otomatis jadi **admin** (sama seperti di Freebuff).
-2. Buka **Admin → Branding** → atur nama situs, logo, favicon, meta.
-3. Buka **Admin → SMTP** → isi host/port/username/password/encryption + sender, klik **Send test email** sampai hijau, lalu aktifkan.
-   > **Penting:** di deployment mandiri, email OTP (signup/login/reset) dikirim lewat SMTP yang kamu konfigurasi. Tanpa SMTP, fallback ke relay Freebuff mungkin tidak tersedia di luar platform — jadi konfigurasi SMTP adalah langkah wajib agar user bisa daftar.
-4. **Admin → Player** → warna aksen, aspek rasio, watermark platform.
-5. **Admin → Users** → aktifkan plan Premium/Platinum setelah pembayaran via Telegram (t.me/cawsociety).
-
----
-
-## 7. Update aplikasi
+Atau manual:
 
 ```bash
-# pull perubahan kode
-git pull
+# 1. Bun
+curl -fsSL https://bun.sh/install | bash   # lalu: export PATH="$HOME/.bun/bin:$PATH"
 
-# kalau ada perubahan Convex:
-bunx convex deploy
+# 2. Dependencies + build
+cd /opt/vidood          # folder hasil clone/upload project
+bun install
+bun run build           # hasil: dist/
 
-# build ulang frontend:
-bun run build
-
-# serve ulang (sesuai pilihan):
-docker compose up -d --build        # Docker
-# atau
-sudo cp -r dist/* /var/www/cawstream/   # nginx bare-metal
+# 3. Jalankan server (uji dulu)
+PORT=8787 bun run server/index.ts
 ```
 
 ---
 
-## 8. Backup
+## 3. Systemd (biar server hidup terus)
 
-- **Data + fungsi**: Convex dashboard → project → **Settings → Data/Export** (export JSON) — lakukan berkala.
-- **Video & file upload**: tersimpan di Convex file storage (terkait deployment). Untuk backup penuh, gunakan ekspor Convex atau tambahkan job sinkronisasi ke S3/R2.
-- Tidak ada data yang tersimpan di VPS (frontend statis), jadi backup VPS tidak terlalu krusial.
+Buat `/etc/systemd/system/vidood.service`:
+
+```ini
+[Unit]
+Description=Vidood Stream server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/vidood
+ExecStart=/root/.bun/bin/bun run server/index.ts
+Restart=always
+RestartSec=3
+# EnvironmentFile=/opt/vidood/.env   # kalau pakai env file
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now vidood
+sudo systemctl status vidood
+```
+
+Log: `journalctl -u vidood -f` — di sinilah kode OTP muncul selama SMTP
+belum dikonfigurasi (mode fallback "console-log").
 
 ---
 
-## 9. Troubleshooting
+## 4. nginx (reverse proxy + HTTPS)
+
+```bash
+sudo cp deploy/nginx-site.conf /etc/nginx/sites-available/vidood
+# ganti "example.com" dengan domain kamu
+sudo ln -s /etc/nginx/sites-available/vidood /etc/nginx/sites-enabled/vidood
+sudo nginx -t && sudo systemctl reload nginx
+
+# HTTPS
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d domainkamu.com --redirect
+```
+
+nginx memproksi **semua** ke `127.0.0.1:8787` (statis + API + media + upload),
+dengan `client_max_body_size 0` supaya upload video besar tidak ditolak.
+
+---
+
+## 5. Konfigurasi di dalam aplikasi (setelah live)
+
+1. **Daftar akun pertama** → otomatis jadi **admin**.
+2. **Admin → SMTP** → isi host/port/username/password/encryption + sender, klik
+   **Send test email** sampai hijau, lalu aktifkan. Selama belum aktif, kode OTP
+   ditulis ke log server (`journalctl -u vidood -f`) supaya signup tetap bisa
+   diuji.
+3. **Admin → Branding** → nama situs, logo, favicon, meta.
+4. **Admin → Player** → warna aksen, watermark platform, dll.
+5. **Admin → Users** → aktifkan plan Premium/Platinum setelah pembayaran
+   via Telegram (t.me/cawsociety).
+
+---
+
+## 6. Update aplikasi
+
+```bash
+cd /opt/vidood
+git pull origin main        # atau upload ulang source terbaru
+bun install
+bun run build
+sudo systemctl restart vidood
+```
+
+---
+
+## 7. Backup
+
+- **Database**: `cawstream.db` (di folder kerja server, atau `DATA_DIR` kalau
+  diset) — backup berkala, atau pasang job SQLite `.backup`.
+- **Video & file**: seluruh folder `storage/` (atau `STORAGE_DIR` kalau diset) —
+  ini **semua video user**, backup wajib.
+- Keduanya bisa di-rsync ke disk lain / S3 / rclone.
+
+---
+
+## 8. Troubleshooting
 
 | Gejala | Penyebab & solusi |
 |---|---|
-| Preview/website blank atau "Did you forget to run convex dev?" | `VITE_CONVEX_URL` salah/tidak diisi saat build. Build ulang dengan URL deployment yang benar. |
-| `bunx convex deploy` gagal | Cek `CONVEX_DEPLOYMENT` / `convex.json`, pastikan login Convex (`bunx convex login`). |
-| Signup tidak terkirim OTP | 1) Cek `CONVEX_SITE_URL` — kalau ada di dashboard Convex dan nilainya bukan `.convex.site`, **hapus** (lihat catatan ⚠️ di bagian 2). 2) Coba pakai **email asli** (mis. Gmail) — relay bawaan menolak alamat seperti `example.com`. 3) Atur **Admin → SMTP** sampai banner hijau *Active and verified* supaya email independen dari relay bawaan. |
-| Sign-in stuck / spinner terus / tidak masuk dashboard (tanpa error) | `CONVEX_SITE_URL` ter-override dengan nilai salah (mis. `.convex.cloud`) — **hapus dari dashboard Convex** supaya pakai default `.convex.site`. Kemudian coba lagi (env berlaku tanpa redeploy; frontend tidak perlu rebuild). |
-| Link preview di medsos tidak muncul | Pastikan domain HTTPS valid; og:image memakai thumbnail video dari Convex. |
-| Upload besar gagal | Limit upload diatur di **Admin → System → Max upload size**; storage Convex punya batas file — naikkan plan Convex jika perlu. |
-| Tombol langganan membuka WhatsApp | Sudah diganti — pastikan build terbaru (semua link pakai **Telegram** t.me/cawsociety). |
+| Website blank / 502 | Server belum jalan: `systemctl status vidood`, cek `journalctl -u vidood -f`. Pastikan build `dist/` ada. |
+| Video tidak bisa diputar / seek | Pastikan nginx mem-proxy `/media` dengan header `Range` (sudah ada di `deploy/nginx-site.conf`) dan `proxy_buffering off`. |
+| Upload video besar gagal | `client_max_body_size` nginx harus `0` (sudah di config) — cek `nginx -t` dan reload. |
+| Signup tidak terkirim OTP | Konfigurasi **Admin → SMTP** + test email sampai hijau. Sebelum itu kode OTP muncul di `journalctl -u vidood -f`. |
+| Link preview medsos tidak muncul | Pastikan HTTPS valid; og:image memakai thumbnail video yang tersimpan di `/media`. |
+| Sesi tidak bertahan | Kalau HTTPS sudah aktif, set `COOKIE_SECURE=1` di env server, lalu restart. |
 
 ---
 
 ## Arsitektur ringkas
 
 ```
-Browser ──► nginx (VPS, port 80/443) ──► dist/ (statis)
-   │
-   ├──► https://<deployment>.convex.cloud  (queries, mutations, auth, upload URL)
-   └──► https://<deployment>.convex.cloud/api/*  (HTTP routes: OTP, thumbnail, video)
+Browser ──► nginx (VPS, 80/443, HTTPS) ──► 127.0.0.1:8787 (Bun server)
+                                             ├── dist/        (frontend statis)
+                                             ├── /api/q /api/m (JSON API)
+                                             ├── /api/upload  (multipart)
+                                             ├── /media/*     (video/thumb, HTTP Range)
+                                             └── cawstream.db + storage/ (SQLite + file)
 ```
 
-Frontend memanggil Convex langsung (HTTPS) — VPS tidak perlu memproksi apa pun, cukup menyajikan file statis.
-`CONVEX_SITE_URL` **jangan di-set manual** — Convex otomatis mengisinya dengan site URL
-`https://<deployment>.convex.site`, dan di situlah route OTP & validasi token hidup.
-
-> *Pilihan lanjutan:* kalau kamu tetap ingin `CONVEX_SITE_URL` = domain VPS (mis. agar terlihat rapi),
-> VPS wajib memproksi path Convex ke **site URL** (`.convex.site`) — lihat blok opsional
-> `location /api/` + `/.well-known/` di `deploy/nginx-site.conf`. Cara paling sederhana & disarankan
-> tetap biarkan default `.convex.site`.
+Tidak ada dependensi eksternal: SQLite via `bun:sqlite`, storage di disk lokal,
+email via nodemailer (SMTP sendiri). Cukup `bun run server/index.ts` + nginx.

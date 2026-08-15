@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { useI18n } from "@/lib/i18n";
-import { useMutation, useQuery } from "convex/react";
+import type { AdSettings } from "@/lib/types";
 import { ExternalLink, Loader2, Megaphone, MousePointerClick, Popcorn, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -41,8 +41,8 @@ const EMPTY: AdsForm = {
 
 export default function Advertisements() {
   const { t } = useI18n();
-  const existing = useQuery(api.ads.getMyAdSettings);
-  const updateAdSettings = useMutation(api.ads.updateAdSettings);
+  const existing = useApiQuery<AdSettings>("ads/getMyAdSettings");
+  const updateAdSettings = useApiMutation("ads/updateAdSettings");
   const [form, setForm] = useState<AdsForm | null>(null);
   const [saving, setSaving] = useState(false);
 

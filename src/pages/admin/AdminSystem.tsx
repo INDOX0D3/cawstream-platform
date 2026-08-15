@@ -9,26 +9,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { formatDateTime } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { FailedJob, SystemStatus } from "@/lib/types";
 import { CheckCircle2, Cpu, Loader2, RefreshCw, Server, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-type FailedJob = NonNullable<
-  ReturnType<typeof useQuery<typeof api.jobs.listFailedJobs>>
->[number];
-
 export default function AdminSystem() {
-  const status = useQuery(api.admin.systemStatus);
-  const failedJobs = useQuery(api.jobs.listFailedJobs);
-  const retryJob = useMutation(api.jobs.retryJob);
+  const status = useApiQuery<SystemStatus>("admin/systemStatus");
+  const failedJobs = useApiQuery<FailedJob[]>("jobs/listFailedJobs");
+  const retryJob = useApiMutation("jobs/retryJob");
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
-  const retry = async (jobId: Id<"processingJobs">) => {
+  const retry = async (jobId: string) => {
     setRetryingId(jobId);
     try {
       await retryJob({ jobId });
@@ -49,10 +44,10 @@ export default function AdminSystem() {
   }
 
   const env = [
-    { label: "Convex deployment", ok: status.environment.convexUrlConfigured },
-    { label: "Resend API key", ok: status.environment.resendKeyConfigured },
-    { label: "Mux keys", ok: status.environment.muxConfigured },
-    { label: "VLY app", ok: Boolean(status.environment.vlyAppName) },
+    { label: "SQLite database", ok: true },
+    { label: "SMTP relay configured", ok: status.environment.smtpConfigured },
+    { label: "SMTP verified (test email)", ok: status.environment.smtpVerified },
+    { label: "Media storage (local disk)", ok: true },
   ];
 
   return (
@@ -92,8 +87,8 @@ export default function AdminSystem() {
               </div>
             ))}
             <div className="flex items-center justify-between border-t pt-3 text-sm">
-              <span className="text-muted-foreground">VLY app name</span>
-              <span className="font-medium">{status.environment.vlyAppName ?? "—"}</span>
+              <span className="text-muted-foreground">Server port</span>
+              <span className="font-medium">{status.environment.port}</span>
             </div>
             <div className="flex items-center justify-between border-t pt-3 text-sm">
               <span className="text-muted-foreground">Storage backend</span>

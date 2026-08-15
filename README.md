@@ -1,67 +1,66 @@
-# CawStream — Video Hosting & Streaming Platform
+# Vidood Stream — Video Hosting & Streaming Platform
 
 A complete, production-oriented video streaming platform: real upload pipeline,
 honest analytics, embed-ready players, per-creator monetization, a user
-dashboard and a full admin panel. Everything runs on your own deployment.
+dashboard and a full admin panel. **Fully self-hosted — no third-party backend.**
+Everything (auth, database, video storage, email) runs on your own VPS.
 
 ## Stack
 
 - **Frontend** — Vite, TypeScript, React 19, Tailwind v4, shadcn/ui, Framer Motion, hls.js
-- **Backend & database** — Convex (reactive queries, file storage, HTTP actions)
-- **Auth** — Convex Auth with email + password, OTP email verification, password reset
-- **Processing** — browser pipeline by default; Mux cloud transcoding (HLS) when Mux keys are set
-- **Email** — Resend via `RESEND_API_KEY` (falls back to a verifiable mail log in dev)
+- **Backend** — Hono on Bun (one process: static SPA + JSON API + media server)
+- **Database** — SQLite via `bun:sqlite` (`cawstream.db`, zero native deps)
+- **Storage** — videos/thumbnails/logos on local disk (`storage/`), HTTP Range support
+- **Auth** — email + password sessions (httpOnly cookie), OTP verification & password reset
+- **Email** — nodemailer; OTP via Admin → SMTP (fallback: code printed to server log)
 - **Tests** — Vitest (`bun test`)
 
-## Quick start
+## Quick start (development)
 
 ```bash
 bun install
-bun convex dev --once   # generate types
-bun dev
+bun run build      # build the frontend into dist/
+bun run server/index.ts   # serve API + media + dist/ on :8787
 ```
 
-The first account that signs up automatically becomes the **administrator**
-(the equivalent of an installer's "create admin" step). Admins reach the panel
-via `/admin`.
+The first account that signs up automatically becomes the **administrator**.
+Admins reach the panel via `/admin`.
 
-## Environment variables (server-side only)
+> Note: there is no Convex anymore. The old `src/convex/` was replaced by
+> `server/` (Hono + SQLite). See `DEPLOY.md` for the VPS setup.
 
-Set these in the deployment environment — never in client code:
+## Environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `MUX_TOKEN_ID` / `MUX_TOKEN_SECRET` | Enable the Mux backend: uploads become cloud-transcoded HLS with an adaptive quality ladder. Without them, uploads use the browser pipeline. |
-| `RESEND_API_KEY` | Deliver verification/reset codes and admin test emails. Without it, emails are recorded in the mail log (Admin → Logs). |
-| `SITE_URL` | Public origin used by auth email flows. |
-| `JWKS` / `JWT_PRIVATE_KEY` | Auth signing keys (managed by the platform). |
+| `PORT` | HTTP port the backend listens on (default `8787`) |
+| `DATA_DIR` | Where the SQLite database lives (default: project dir) |
+| `STORAGE_DIR` | Where videos/thumbnails/logos are stored (default `./storage`) |
+| `COOKIE_SECURE` | Set `1` when serving over HTTPS (secure session cookie) |
+| `FREEBUFF_RELAY_URL` / `FREEBUFF_RELAY_KEY` | Optional OTP fallback relay |
 
-Normal users can never read server credentials: SMTP details are masked in the
-API, and admins configure delivery through the admin panel, not `.env`.
+SMTP is configured in **Admin → SMTP** (host, port, encryption, username,
+password, sender) and only used after a successful test email. Until then, OTP
+codes are printed to the server log so sign-up still works.
 
 ## How processing works
 
-Two real pipelines, selected automatically:
-
-- **Browser pipeline** — files are validated by their *magic bytes* (`src/lib/video.ts`),
-  then duration, resolution, codec and a real thumbnail are extracted from the
-  actual file. State (uploading → processing → ready/failed) is tracked in
-  `src/convex/videos.ts` with a processing job per upload.
-- **Mux pipeline** — with Mux keys set, files are PUT to a Mux direct upload and
-  polled until the transcode completes (`src/convex/processor.ts`). Playback
-  switches to HLS via hls.js with a native fallback for Safari.
+A real browser pipeline (`src/lib/video.ts`): files are validated by their
+*magic bytes*, then duration, resolution, codec and a real thumbnail are
+extracted from the actual file. The file is streamed to the server
+(`PUT /api/videos/:id/file`) with progress + abort support, and state
+(uploading → processing → ready/failed) is tracked in SQLite.
 
 ## Public URLs (per video)
 
 Given a video's `publicId`:
 
-- `/{publicId}` isn't used — instead:
 - `/v/{publicId}` — watch page
-- `/e/{publicId}` — iframe embed surface (chrome-free)
+- `/e/{publicId}` — iframe embed surface (chrome-free, ads run here)
 - `/video/{publicId}.mp4` — direct MP4 stream (302 → storage, supports Range)
-- `/thumb/{publicId}.jpg` — thumbnail (302 → stored/Mux image)
+- `/thumb/{publicId}.jpg` — thumbnail (302 → stored file)
 
-These are served by Convex HTTP actions (`src/convex/http.ts`).
+These are served by the Bun backend (`server/index.ts`).
 
 ## Monetization
 
@@ -69,18 +68,19 @@ Creators configure smartlinks, social bars and popunders in
 Dashboard → Advertisements. Ads are resolved **server-side** from
 video → owner → ad settings at render time, so existing embeds pick up new ads
 without re-embedding. Ad code only ever executes inside the player/embed
-context — sandboxed iframe for social bars, detached window for popunders.
+context — sandboxed in-player host for social bars, detached window for
+popunders.
 
 ## Architecture notes
 
-- `src/convex/schema.ts` — data model (users, videos, views, ads, settings, jobs, logs).
-- `src/convex/lib/storage.ts` — storage adapter; swap to S3/R2/B2 by replacing
-  these helpers without touching the rest of the codebase.
-- `src/convex/settings.ts` — admin-configurable player/branding/SMTP/site/limits,
-  persisted in `systemSettings`, sensitive values masked.
+- `server/db.ts` — SQLite schema + accessors (users, videos, views, ads,
+  settings, jobs, logs, sessions, OTPs).
+- `server/media.ts` — local disk storage + Range-capable media serving.
+- `server/queries.ts` / `server/mutations.ts` — JSON API mirroring the old
+  Convex query/mutation paths (`/api/q/:path`, `/api/m/:path`).
 - Analytics are non-invasive: a random per-browser id is SHA-256 hashed
   server-side, and a viewer can only increment a video's count once per
-  10-minute window (`src/convex/views.ts`).
+  10-minute window.
 
 ## Tests
 
@@ -88,6 +88,5 @@ context — sandboxed iframe for social bars, detached window for popunders.
 bun test
 ```
 
-Covers the pure pipeline helpers (container detection by magic bytes, upload
-validation), formatting utilities, server-side validation rules and public id
-generation.
+Covers the pure helpers: public id generation, password hashing, validation
+rules and ad-settings validation.

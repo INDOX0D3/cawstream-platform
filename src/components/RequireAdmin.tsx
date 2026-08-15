@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation, useQuery } from "convex/react";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { Loader2, ShieldAlert, ShieldCheck, UserRoundX } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, Navigate } from "react-router";
@@ -17,8 +16,8 @@ import { toast } from "sonner";
  */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { isLoading, isAuthenticated, user } = useAuth();
-  const adminStatus = useQuery(api.users.adminStatus);
-  const bootstrapAdmin = useMutation(api.users.bootstrapAdmin);
+  const adminStatus = useApiQuery<{ hasAdmin: boolean }>("users/adminStatus");
+  const bootstrapAdmin = useApiMutation("users/bootstrapAdmin");
 
   if (isLoading) {
     return (

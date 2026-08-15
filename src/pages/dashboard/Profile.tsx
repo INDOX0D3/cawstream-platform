@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { useI18n } from "@/lib/i18n";
-import { useMutation, useQuery } from "convex/react";
 import { AtSign, CheckCircle2, Loader2, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -25,7 +24,7 @@ function initials(name: string): string {
 export default function Profile() {
   const { user } = useAuth();
   const { t } = useI18n();
-  const updateProfile = useMutation(api.users.updateProfile);
+  const updateProfile = useApiMutation("users/updateProfile");
 
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
@@ -44,8 +43,8 @@ export default function Profile() {
   );
   const checkUsername =
     usernameValid && username !== user?.username ? username : null;
-  const taken = useQuery(
-    api.users.isUsernameTaken,
+  const taken = useApiQuery<boolean>(
+    "users/isUsernameTaken",
     checkUsername ? { username: checkUsername } : "skip",
   );
   const usernameTaken = taken === true;

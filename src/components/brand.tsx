@@ -1,5 +1,5 @@
-import { api } from "@/convex/_generated/api";
-import { useQuery } from "convex/react";
+import { useApiQuery } from "@/hooks/use-api";
+import type { PublicConfig } from "@/lib/types";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +40,7 @@ export function Logo({
   /** Optional explicit logo URL — falls back to the uploaded site logo. */
   src?: string;
 }) {
-  const config = useQuery(api.settings.getPublicConfig);
+  const config = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const logoUrl = src || config?.site.logoUrl || "";
   const name = config?.site.name || "Vidood Stream";
 

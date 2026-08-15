@@ -1,17 +1,15 @@
 import { PageHeader } from "@/components/layout/Shell";
 import { StatCard } from "@/components/StatCard";
-import { api } from "@/convex/_generated/api";
+import { useApiQuery } from "@/hooks/use-api";
 import { formatBytes } from "@/lib/format";
-import { useQuery } from "convex/react";
+import type { StorageBreakdown } from "@/lib/types";
 import { HardDrive, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type StorageRow = NonNullable<
-  ReturnType<typeof useQuery<typeof api.admin.storageBreakdown>>
->["perUser"][number];
+type StorageRow = StorageBreakdown["perUser"][number];
 
 export default function AdminStorage() {
-  const data = useQuery(api.admin.storageBreakdown);
+  const data = useApiQuery<StorageBreakdown>("admin/storageBreakdown");
 
   if (!data) {
     return (
@@ -71,8 +69,8 @@ export default function AdminStorage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Files are stored in Convex file storage. The storage layer can be moved
-        to S3 / R2 / B2 by swapping the helpers in src/convex/lib/storage.ts.
+        Files are stored on the server's own disk under storage/ (videos,
+        thumbnails and uploaded logos) and served with HTTP Range support.
       </p>
     </div>
   );

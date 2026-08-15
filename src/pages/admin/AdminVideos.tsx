@@ -19,19 +19,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { formatBytes, formatCompact, formatRelative } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
+import type { AdminVideo } from "@/lib/types";
 import { ExternalLink, Loader2, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 
-type VideoRow = NonNullable<ReturnType<typeof useQuery<typeof api.admin.listVideos>>>[number];
+type VideoRow = AdminVideo;
 
 export default function AdminVideos() {
-  const videos = useQuery(api.admin.listVideos);
-  const adminDeleteVideo = useMutation(api.admin.adminDeleteVideo);
+  const videos = useApiQuery<AdminVideo[]>("admin/listVideos");
+  const adminDeleteVideo = useApiMutation("admin/adminDeleteVideo");
   const [deleting, setDeleting] = useState<VideoRow | null>(null);
 
   const confirmDelete = async () => {

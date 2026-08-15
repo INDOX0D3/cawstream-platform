@@ -3,11 +3,11 @@ import { StatCard } from "@/components/StatCard";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
 import { VideoCard } from "@/components/VideoCard";
 import { Button } from "@/components/ui/button";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiQuery } from "@/hooks/use-api";
 import { formatBytes } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
-import { useQuery } from "convex/react";
+import type { DashboardStats, Usage, VideoItem } from "@/lib/types";
 import {
   Clapperboard,
   Crown,
@@ -28,15 +28,13 @@ const PLAN_NAME: Record<string, string> = {
   platinum: "Platinum",
 };
 
-type RecentUpload = NonNullable<
-  ReturnType<typeof useQuery<typeof api.videos.getDashboardStats>>
->["recentUploads"][number];
+type RecentUpload = VideoItem;
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useI18n();
-  const stats = useQuery(api.videos.getDashboardStats);
-  const usage = useQuery(api.videos.getUsage);
+  const stats = useApiQuery<DashboardStats>("videos/getDashboardStats");
+  const usage = useApiQuery<Usage>("videos/getUsage");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   if (stats === undefined) {

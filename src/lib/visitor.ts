@@ -1,6 +1,6 @@
 /**
  * A stable, random, per-browser id used for non-invasive view analytics.
- * It is hashed on the server (see src/convex/views.ts) before storage, so no
+ * It is hashed on the server (see server/mutations.ts) before storage, so no
  * raw identity is ever persisted. No fingerprinting.
  */
 const KEY = "cawstream.visitor";

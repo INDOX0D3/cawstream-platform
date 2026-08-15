@@ -2,9 +2,9 @@ import { PageHeader } from "@/components/layout/Shell";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/convex/_generated/api";
+import { useApiQuery } from "@/hooks/use-api";
 import { formatBytes } from "@/lib/format";
-import { useQuery } from "convex/react";
+import type { AdminOverview as OverviewData, PublicConfig } from "@/lib/types";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 
 export default function AdminOverview() {
-  const data = useQuery(api.admin.overview);
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const data = useApiQuery<OverviewData>("admin/overview");
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
 
   if (!data) {
     return (

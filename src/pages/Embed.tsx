@@ -1,10 +1,58 @@
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { api } from "@/convex/_generated/api";
+import { useApiQuery } from "@/hooks/use-api";
 import { applyVideoMeta } from "@/lib/seo";
-import { useQuery } from "convex/react";
 import { Loader2, PlayCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router";
+
+interface EmbedPayload {
+  video: {
+    _id: string;
+    publicId: string;
+    title: string;
+    status: string;
+    error: string | null;
+    duration: number | null;
+    width: number | null;
+    height: number | null;
+    playbackType: "direct" | "hls" | null;
+    muxPlaybackId: string | null;
+    directUrl: string | null;
+    thumbnailUrl: string | null;
+    posterUrl: string | null;
+    views: number;
+    createdAt: number;
+  };
+  ads: {
+    smartlinkEnabled: boolean;
+    smartlinkUrl: string;
+    socialBarEnabled: boolean;
+    socialBarCode: string;
+    popunderEnabled: boolean;
+    popunderCode: string;
+    frequency: "session" | "always";
+  };
+  player: {
+    aspectRatio: string;
+    defaultQuality: string;
+    autoplay: boolean;
+    controls: boolean;
+    pictureInPicture: boolean;
+    defaultVolume: number;
+    showBranding: boolean;
+    accentColor: string;
+  };
+  branding: {
+    watermarkEnabled: boolean;
+    watermarkText: string;
+    watermarkLogoUrl: string;
+    watermarkPosition: string;
+    watermarkSize: number;
+    watermarkOpacity: number;
+    watermarkMargin: number;
+  };
+  site: { name: string; supportEmail: string };
+}
 
 /**
  * Minimal chrome-free embed surface used by the iframe embed code.
@@ -20,7 +68,7 @@ export default function Embed() {
   const { publicId = "" } = useParams();
   const autofull = new URLSearchParams(window.location.search).get("autofull");
   const autoFullscreen = autofull !== "0";
-  const payload = useQuery(api.videos.getEmbed, { publicId });
+  const payload = useApiQuery<EmbedPayload | null>("videos/getEmbed", { publicId });
 
   // The embed URL is often pasted into chats — keep the document head in sync
   // so JS-rendering crawlers and browsers show a proper video preview.

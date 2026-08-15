@@ -13,13 +13,12 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
+import type { AdminSettings } from "@/lib/types";
 import { Globe, ImageIcon, Loader2, Stamp, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { uploadBlob } from "@/lib/video";
+import { uploadFormFile } from "@/lib/video";
 import { cn } from "@/lib/utils";
 
 interface BrandingForm {
@@ -44,10 +43,8 @@ interface SiteForm {
 }
 
 export default function AdminBranding() {
-  const settings = useQuery(api.settings.getAdminSettings);
-  const updateSettings = useMutation(api.settings.updateSettings);
-  const getUploadUrl = useMutation(api.settings.getUploadUrl);
-  const resolveUpload = useMutation(api.settings.resolveUpload);
+  const settings = useApiQuery<AdminSettings>("settings/getAdminSettings");
+  const updateSettings = useApiMutation("settings/updateSettings");
 
   const [form, setForm] = useState<BrandingForm | null>(null);
   const [siteForm, setSiteForm] = useState<SiteForm | null>(null);
@@ -119,14 +116,12 @@ export default function AdminBranding() {
     }
   };
 
-  /** Upload a file (logo or favicon) to Convex storage and store its public URL. */
+  /** Upload a file (logo or favicon) to the self-hosted server and store its URL. */
   const handleImageUpload = async (kind: "logo" | "icon", file: File | undefined) => {
     if (!file) return;
     setUploading(kind);
     try {
-      const uploadUrl = await getUploadUrl();
-      const storageId = (await uploadBlob(uploadUrl, file)) as Id<"_storage">;
-      const url = await resolveUpload({ storageId });
+      const { url } = await uploadFormFile("/api/upload", file, file.name);
       setSite(kind === "logo" ? "logoUrl" : "iconUrl", url);
       toast.success(kind === "logo" ? "Logo uploaded" : "Favicon uploaded");
     } catch (error) {

@@ -11,12 +11,11 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { telegramSubscribeLink } from "@/lib/plans";
-import { uploadBlob } from "@/lib/video";
+import { uploadFormFile } from "@/lib/video";
 import { useI18n } from "@/lib/i18n";
-import { useMutation, useQuery } from "convex/react";
+import type { PublicConfig, PlayerPrefsUser, User, WatermarkConfig } from "@/lib/types";
 import { Crown, Gauge, ImageIcon, Loader2, MonitorPlay, Stamp, Upload, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -42,20 +41,18 @@ const PAID_PLANS = ["premium", "platinum"];
 
 export default function PlayerSettings() {
   const { t } = useI18n();
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const siteName = siteConfig?.site.name || "Vidood Stream";
-  const existing = useQuery(api.playerPrefs.getMyPlayerSettings);
-  const update = useMutation(api.playerPrefs.updatePlayerSettings);
+  const existing = useApiQuery<PlayerPrefsUser>("playerPrefs/getMyPlayerSettings");
+  const update = useApiMutation("playerPrefs/updatePlayerSettings");
   const [form, setForm] = useState<PrefsForm | null>(null);
   const [saving, setSaving] = useState(false);
 
   // --- Owner brand watermark (paid plans) -----------------------------------
-  const me = useQuery(api.users.currentUser);
+  const me = useApiQuery<User | null>("users/currentUser");
   const isPaid = me !== undefined && me !== null && PAID_PLANS.includes(me.plan);
-  const wm = useQuery(api.watermark.getMyWatermark);
-  const updateWatermark = useMutation(api.watermark.updateWatermark);
-  const getUploadUrl = useMutation(api.watermark.getUploadUrl);
-  const resolveUpload = useMutation(api.watermark.resolveUpload);
+  const wm = useApiQuery<WatermarkConfig | null>("watermark/getMyWatermark");
+  const updateWatermark = useApiMutation<WatermarkForm>("watermark/updateWatermark");
   const [wmForm, setWmForm] = useState<WatermarkForm | null>(null);
   const [savingWm, setSavingWm] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -131,9 +128,7 @@ export default function PlayerSettings() {
     if (!file) return;
     setUploading(true);
     try {
-      const uploadUrl = await getUploadUrl();
-      const storageId = (await uploadBlob(uploadUrl, file)) as Id<"_storage">;
-      const url = await resolveUpload({ storageId });
+      const { url } = await uploadFormFile("/api/upload", file, file.name);
       setWm("logoUrl", url);
       toast.success(t("watermark.upload"));
     } catch (error) {

@@ -1,10 +1,10 @@
 # =============================================================================
-# CawStream — production image
-# Build:  docker build --build-arg VITE_CONVEX_URL=https://<deploy>.convex.cloud -t cawstream .
-# Run:    docker run -p 80:80 cawstream
+# Vidood Stream — production image (self-hosted, no Convex)
+# Build:  docker build -t vidood .
+# Run:    docker run -p 80:8787 -v vidood-data:/app/data -v vidood-storage:/app/storage vidood
 # =============================================================================
 
-# ---- Build stage ------------------------------------------------------------
+# ---- Build stage: frontend --------------------------------------------------
 FROM oven/bun:1 AS build
 WORKDIR /app
 
@@ -12,16 +12,24 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile || bun install
 
-# Source + build. VITE_CONVEX_URL is baked into the bundle at build time.
+# Source + build.
 COPY . .
-ARG VITE_CONVEX_URL
-ENV VITE_CONVEX_URL=$VITE_CONVEX_URL
 RUN bun run build
 
-# ---- Serve stage ------------------------------------------------------------
-FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
-CMD ["nginx", "-g", "daemon off;"]
+# ---- Runtime stage: Bun server (API + media + static dist) ------------------
+FROM oven/bun:1 AS runtime
+WORKDIR /app
+
+COPY --from=build /app/package.json /app/bun.lock* ./
+RUN bun install --frozen-lockfile --production || bun install --production
+COPY --from=build /app/dist ./dist
+COPY server ./server
+COPY tsconfig.server.json ./tsconfig.server.json
+
+ENV PORT=8787
+EXPOSE 8787
+
+# Persist database + uploaded media outside the container.
+VOLUME ["/app/data", "/app/storage"]
+
+CMD ["bun", "run", "server/index.ts"]

@@ -2,10 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiMutation } from "@/hooks/use-api";
 import { useI18n } from "@/lib/i18n";
-import { useMutation } from "convex/react";
 import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +12,7 @@ import { toast } from "sonner";
 export default function Security() {
   const { user } = useAuth();
   const { t } = useI18n();
-  const changePassword = useMutation(api.users.changePassword);
+  const changePassword = useApiMutation("users/changePassword");
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");

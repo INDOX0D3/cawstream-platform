@@ -2,10 +2,10 @@ import { CawMark, Logo } from "@/components/brand";
 import { PricingCards } from "@/components/Pricing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiQuery } from "@/hooks/use-api";
 import { LanguageSwitcher, useI18n, type DictKey } from "@/lib/i18n";
-import { useQuery } from "convex/react";
+import type { PublicConfig } from "@/lib/types";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -145,7 +145,7 @@ function Pipeline() {
 }
 
 export default function Landing() {
-  const config = useQuery(api.settings.getPublicConfig);
+  const config = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const { isAuthenticated } = useAuth();
   const { t } = useI18n();
 

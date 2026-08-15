@@ -7,11 +7,13 @@
  *                        duration / dimensions; derives bitrate from size.
  *  3. generateThumbnail— seeks into the video and captures a frame to a JPEG
  *                        blob through a canvas.
- *  4. uploadBlob       — PUTs blobs to a Convex storage upload URL with real
- *                        progress events and cancellation.
+ *  4. uploadVideoFile   — PUTs the file to the self-hosted upload endpoint
+ *                        (/api/videos/:id/file) with real progress + abort.
+ *  5. completeVideoUpload — POSTs metadata + thumbnails (multipart) to mark
+ *                        the video ready on the self-hosted server.
  *
- * This is the "browser" processing backend. When MUX_TOKEN_ID/SECRET are set
- * (see src/convex/processor.ts) uploads go through Mux instead.
+ * This is the only processing backend: everything runs in the browser and the
+ * file is stored on the server's own disk.
  */
 
 import { formatBytes } from "./format";
@@ -240,18 +242,19 @@ export interface UploadProgress {
 }
 
 /**
- * Upload a blob to a Convex storage upload URL using XHR so we get real
- * progress events. Resolves with the returned storage id.
+ * Stream a blob to the self-hosted upload endpoint (PUT /api/videos/:id/file)
+ * using XHR so we get real progress events. Resolves when the server stored
+ * the file.
  */
-export function uploadBlob(
+export function uploadVideoFile(
   uploadUrl: string,
   blob: Blob,
   onProgress?: (p: UploadProgress) => void,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", uploadUrl);
+    xhr.open("PUT", uploadUrl);
     xhr.responseType = "json";
 
     if (signal) {
@@ -271,17 +274,100 @@ export function uploadBlob(
     };
 
     xhr.onload = () => {
-      const body = xhr.response as { storageId?: string } | undefined;
-      if (xhr.status >= 200 && xhr.status < 300 && body?.storageId) {
-        resolve(body.storageId);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
       } else {
-        reject(new Error(`Upload failed (HTTP ${xhr.status}).`));
+        const body = xhr.response as { error?: string } | undefined;
+        reject(new Error(body?.error ?? `Upload failed (HTTP ${xhr.status}).`));
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed — network error."));
     xhr.onabort = () => reject(new DOMException("Upload aborted", "AbortError"));
 
     xhr.send(blob);
+  });
+}
+
+/** POST a single file to /api/upload (logos, favicons) → { url }. */
+export function uploadFormFile(
+  url: string,
+  blob: Blob,
+  fileName = "file.png",
+  onProgress?: (p: UploadProgress) => void,
+): Promise<{ url: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.responseType = "json";
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percent: Math.min(100, Math.round((event.loaded / event.total) * 100)),
+          });
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      const body = xhr.response as { url?: string; error?: string } | undefined;
+      if (xhr.status >= 200 && xhr.status < 300 && body?.url) {
+        resolve({ url: body.url });
+      } else {
+        reject(new Error(body?.error ?? `Upload failed (HTTP ${xhr.status}).`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed — network error."));
+
+    const form = new FormData();
+    form.append("file", blob, fileName);
+    xhr.send(form);
+  });
+}
+
+/**
+ * POST metadata + optional thumbnails to /api/videos/:id/complete (multipart).
+ * Marks the video ready once the server stored the files.
+ */
+export function completeVideoUpload(
+  videoId: string,
+  opts: {
+    duration?: number;
+    width?: number;
+    height?: number;
+    codec?: string;
+    bitrate?: number;
+    fps?: number;
+    thumbnail?: Blob | null;
+    socialThumbnail?: Blob | null;
+  },
+): Promise<void> {
+  const form = new FormData();
+  form.append(
+    "meta",
+    JSON.stringify({
+      duration: opts.duration,
+      width: opts.width,
+      height: opts.height,
+      codec: opts.codec,
+      bitrate: opts.bitrate,
+      fps: opts.fps,
+    }),
+  );
+  if (opts.thumbnail) form.append("thumb", opts.thumbnail, "thumb.jpg");
+  if (opts.socialThumbnail) form.append("social", opts.socialThumbnail, "social.jpg");
+  return fetch(`/api/videos/${videoId}/complete`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error ?? `Upload failed (HTTP ${res.status}).`);
+    }
   });
 }
 

@@ -2,7 +2,7 @@
  * Billing plans for CawStream.
  *
  * Free accounts are capped at 500 MB of uploads (enforced server-side in
- * src/convex/videos.ts). Premium/Platinum are activated manually by an
+ * server/mutations.ts). Premium/Platinum are activated manually by an
  * administrator (Admin → Users → Plan) after the subscriber pays — contact
  * via Telegram (t.me/cawsociety).
  */

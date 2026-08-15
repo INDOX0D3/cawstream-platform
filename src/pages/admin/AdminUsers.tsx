@@ -28,15 +28,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { formatBytes, formatDate } from "@/lib/format";
-import { useMutation, useQuery } from "convex/react";
+import type { AdminUser, PlanId } from "@/lib/types";
 import { Ban, CheckCircle2, Loader2, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import type { Plan } from "@/convex/schema";
 import { useState } from "react";
 import { toast } from "sonner";
 
-type UserRow = NonNullable<ReturnType<typeof useQuery<typeof api.admin.listUsers>>>[number];
+type UserRow = AdminUser;
 
 function initials(name: string): string {
   return name
@@ -49,11 +48,11 @@ function initials(name: string): string {
 
 export default function AdminUsers() {
   const { user: me } = useAuth();
-  const users = useQuery(api.admin.listUsers);
-  const setUserStatus = useMutation(api.admin.setUserStatus);
-  const setUserRole = useMutation(api.admin.setUserRole);
-  const setUserPlan = useMutation(api.admin.setUserPlan);
-  const deleteUser = useMutation(api.admin.deleteUser);
+  const users = useApiQuery<AdminUser[]>("admin/listUsers");
+  const setUserStatus = useApiMutation("admin/setUserStatus");
+  const setUserRole = useApiMutation("admin/setUserRole");
+  const setUserPlan = useApiMutation("admin/setUserPlan");
+  const deleteUser = useApiMutation("admin/deleteUser");
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
@@ -87,7 +86,7 @@ export default function AdminUsers() {
     }
   };
 
-  const changePlan = async (user: UserRow, plan: Plan) => {
+  const changePlan = async (user: UserRow, plan: PlanId) => {
     if (plan === (user.plan ?? "free")) return;
     setBusyPlanId(user._id);
     try {
@@ -180,7 +179,7 @@ export default function AdminUsers() {
                   <TableCell>
                     <Select
                       value={user.plan ?? "free"}
-                      onValueChange={(v) => void changePlan(user, v as Plan)}
+                      onValueChange={(v) => void changePlan(user, v as PlanId)}
                       disabled={busyPlanId === user._id}
                     >
                       <SelectTrigger className="h-7 w-28 text-xs">

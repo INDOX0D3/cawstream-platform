@@ -21,9 +21,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { formatDateTime } from "@/lib/format";
-import { useAction, useMutation, useQuery } from "convex/react";
+import type { AdminSettings, SentEmail } from "@/lib/types";
 import { Loader2, Mail, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -41,15 +41,13 @@ interface SmtpForm {
   verified: boolean;
 }
 
-type SentMail = NonNullable<
-  ReturnType<typeof useQuery<typeof api.mailer.listSentEmails>>
->[number];
-
 export default function AdminSmtp() {
-  const settings = useQuery(api.settings.getAdminSettings);
-  const updateSettings = useMutation(api.settings.updateSettings);
-  const sendTestEmail = useAction(api.mailSmtp.sendTestEmail);
-  const sentEmails = useQuery(api.mailer.listSentEmails);
+  const settings = useApiQuery<AdminSettings>("settings/getAdminSettings");
+  const updateSettings = useApiMutation("settings/updateSettings");
+  const sendTestEmail = useApiMutation<{ to: string }, { delivered: boolean; mode: string; message?: string }>(
+    "mailSmtp/sendTestEmail",
+  );
+  const sentEmails = useApiQuery<SentEmail[]>("mailer/listSentEmails");
 
   const [form, setForm] = useState<SmtpForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -332,7 +330,7 @@ export default function AdminSmtp() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sentEmails.map((mail: SentMail) => (
+                sentEmails.map((mail: SentEmail) => (
                   <TableRow key={mail._id}>
                     <TableCell className="text-sm">{mail.to}</TableCell>
                     <TableCell className="max-w-[280px] truncate text-sm">{mail.subject}</TableCell>

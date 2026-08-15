@@ -2,7 +2,7 @@
  * CawStream advertisement module.
  *
  * Ads are user-configured (dashboard → Advertisements) and resolved on the
- * server from VIDEO → OWNER → USER AD SETTINGS (see src/convex/ads.ts). This
+ * server from VIDEO → OWNER → USER AD SETTINGS (see server/queries.ts). This
  * component only *runs* them inside the public player/embed context — the
  * ads belong to the video player page, never to the rest of the site.
  *

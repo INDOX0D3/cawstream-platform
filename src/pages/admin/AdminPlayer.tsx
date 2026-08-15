@@ -12,8 +12,8 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { PLAYER_ACCENTS } from "@/components/VideoPlayer";
-import { api } from "@/convex/_generated/api";
-import { useMutation, useQuery } from "convex/react";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
+import type { AdminSettings } from "@/lib/types";
 import { Loader2, MonitorPlay } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,8 +30,8 @@ interface PlayerForm {
 }
 
 export default function AdminPlayer() {
-  const settings = useQuery(api.settings.getAdminSettings);
-  const updateSettings = useMutation(api.settings.updateSettings);
+  const settings = useApiQuery<AdminSettings>("settings/getAdminSettings");
+  const updateSettings = useApiMutation("settings/updateSettings");
   const [form, setForm] = useState<PlayerForm | null>(null);
   const [saving, setSaving] = useState(false);
 

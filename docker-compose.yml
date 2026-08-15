@@ -1,15 +1,22 @@
-# CawStream — one-command run: `docker compose up -d --build`
-#
-# Before starting, create `.env` in this directory with at least:
-#   VITE_CONVEX_URL=https://<your-deployment>.convex.cloud
-# (see deploy/env.example for the full list)
+# Vidood Stream — one-command run: `docker compose up -d --build`
+# Everything (frontend, API, database, media) runs in one container.
 services:
   web:
     build:
       context: .
-      args:
-        VITE_CONVEX_URL: ${VITE_CONVEX_URL:?Set VITE_CONVEX_URL in .env}
-    image: cawstream
+    image: vidood
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:8787"
+    environment:
+      PORT: 8787
+      COOKIE_SECURE: "1"          # set 0 if not behind HTTPS
+      DATA_DIR: /app/data
+      STORAGE_DIR: /app/storage
+    volumes:
+      - vidood-data:/app/data
+      - vidood-storage:/app/storage
+
+volumes:
+  vidood-data:
+  vidood-storage:

@@ -2,28 +2,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
-import { api } from "@/convex/_generated/api";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { videoUrls } from "@/lib/embed";
 import { formatBytes } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import {
+  completeVideoUpload,
   detectVideoType,
   extractMetadata,
   generateSocialThumbnail,
   generateThumbnail,
-  uploadBlob,
+  uploadVideoFile,
   validateVideoFile,
   type UploadProgress,
 } from "@/lib/video";
-import { useMutation, useQuery } from "convex/react";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { PublicConfig, Usage } from "@/lib/types";
 import {
   CheckCircle2,
   CloudUpload,
   Crown,
   FileVideo,
   Loader2,
-  Sparkles,
   UploadCloud,
   XCircle,
 } from "lucide-react";
@@ -40,57 +39,25 @@ interface RunState {
   sizeBytes: number;
   detail: string;
   publicId?: string;
-  backend?: "browser" | "mux";
   error?: string;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** PUT a blob to a Mux direct-upload URL with real progress events. */
-function putBlob(
-  uploadUrl: string,
-  blob: Blob,
-  onProgress?: (p: UploadProgress) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", uploadUrl);
-    if (signal) {
-      const abort = () => xhr.abort();
-      if (signal.aborted) abort();
-      else signal.addEventListener("abort", abort, { once: true });
-    }
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        onProgress({
-          loaded: event.loaded,
-          total: event.total,
-          percent: Math.min(100, Math.round((event.loaded / event.total) * 100)),
-        });
-      }
-    };
-    xhr.onload = () => resolve();
-    xhr.onerror = () => reject(new Error("Upload failed — network error."));
-    xhr.onabort = () => reject(new DOMException("Upload aborted", "AbortError"));
-    xhr.send(blob);
-  });
+interface PrepareResult {
+  videoId: string;
+  publicId: string;
+  backend: "browser";
+  uploadUrl: string;
+  muxUploadId: null;
 }
 
 export default function Upload() {
-  const config = useQuery(api.settings.getPublicConfig);
-  const backend = useQuery(api.processor.getBackend);
-  const usage = useQuery(api.videos.getUsage);
+  const config = useApiQuery<PublicConfig>("settings/getPublicConfig");
+  const usage = useApiQuery<Usage>("videos/getUsage");
   const { t } = useI18n();
 
-  const prepareUpload = useMutation(api.videos.prepareUpload);
-  const getUploadUrl = useMutation(api.videos.getUploadUrl);
-  const finalizeUpload = useMutation(api.videos.finalizeUpload);
-  const completeProcessing = useMutation(api.videos.completeProcessing);
-  const checkMuxUpload = useMutation(api.processor.checkMuxUpload);
-  const cancelUpload = useMutation(api.videos.cancelUpload);
-  const markFailed = useMutation(api.videos.markFailed);
-  const attachSocialThumb = useMutation(api.videos.attachSocialThumbnail);
+  const prepareUpload = useApiMutation<Record<string, unknown>, PrepareResult>("videos/prepareUpload");
+  const cancelUpload = useApiMutation("videos/cancelUpload");
+  const markFailed = useApiMutation("videos/markFailed");
 
   const [title, setTitle] = useState("");
   const [run, setRun] = useState<RunState | null>(null);
@@ -98,7 +65,7 @@ export default function Upload() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const videoIdRef = useRef<Id<"videos"> | null>(null);
+  const videoIdRef = useRef<string | null>(null);
 
   const maxBytes = config?.limits.maxUploadBytes ?? 1024 * 1024 * 1024;
   const plan = usage?.plan ?? "free";
@@ -155,68 +122,11 @@ export default function Upload() {
         });
         videoIdRef.current = prepared.videoId;
 
-        if (prepared.backend === "mux") {
-          // ---- Mux pipeline: PUT the file, then poll the transcode.
-          setRun((r) =>
-            r ? { ...r, phase: "uploading", backend: "mux", detail: "Uploading to Mux…" } : r,
-          );
-          // The play-button poster is captured locally while the upload runs.
-          const socialThumbPromise = generateSocialThumbnail(file).catch(() => null);
-          await putBlob(prepared.uploadUrl, file, (p) => {
-            setRun((r) => (r ? { ...r, progress: p.percent } : r));
-          }, active.signal);
-
-          setRun((r) =>
-            r
-              ? {
-                  ...r,
-                  phase: "processing",
-                  progress: 100,
-                  detail: "Transcoding on Mux (this can take a few minutes)…",
-                }
-              : r,
-          );
-          const deadline = Date.now() + 12 * 60 * 1000;
-          let ready = false;
-          while (Date.now() < deadline) {
-            const result = await checkMuxUpload({
-              videoId: prepared.videoId,
-              muxUploadId: prepared.muxUploadId as string,
-            });
-            if (result.status === "ready") {
-              ready = true;
-              break;
-            }
-            await sleep(4000);
-            if (active.signal.aborted) throw new DOMException("Upload aborted", "AbortError");
-          }
-          if (!ready) {
-            await markFailed({ videoId: prepared.videoId, error: "Timed out waiting for Mux." });
-            throw new Error("Mux transcoding timed out. Try uploading again.");
-          }
-          const socialThumb = await socialThumbPromise;
-          if (socialThumb) {
-            try {
-              const socialUrl = await getUploadUrl();
-              const socialId = (await uploadBlob(socialUrl, socialThumb)) as Id<"_storage">;
-              await attachSocialThumb({ videoId: prepared.videoId, storageId: socialId });
-            } catch {
-              // the poster is optional — the video still previews with its regular thumb
-            }
-          }
-          setRun((r) =>
-            r
-              ? { ...r, phase: "done", detail: "Ready", publicId: prepared.publicId }
-              : r,
-          );
-          return;
-        }
-
-        // ---- Browser pipeline: upload + real metadata/thumbnail extraction.
+        // Upload the file to the self-hosted server (real progress + abort).
         setRun((r) =>
-          r ? { ...r, phase: "uploading", backend: "browser", detail: "Uploading…" } : r,
+          r ? { ...r, phase: "uploading", detail: "Uploading…" } : r,
         );
-        const uploadPromise = uploadBlob(prepared.uploadUrl, file, (p) => {
+        const uploadPromise = uploadVideoFile(prepared.uploadUrl, file, (p: UploadProgress) => {
           setRun((r) => (r ? { ...r, progress: p.percent } : r));
         }, active.signal);
 
@@ -229,8 +139,7 @@ export default function Upload() {
           generateSocialThumbnail(file).catch(() => null),
         ]);
 
-        const storageId = (await uploadPromise) as Id<"_storage">;
-        await finalizeUpload({ videoId: prepared.videoId, storageId });
+        await uploadPromise;
 
         setRun((r) =>
           r
@@ -242,39 +151,19 @@ export default function Upload() {
               }
             : r,
         );
-        let thumbnailStorageId: Id<"_storage"> | undefined;
-        try {
-          const thumbUrl = await getUploadUrl();
-          thumbnailStorageId = (await uploadBlob(thumbUrl, thumb)) as Id<"_storage">;
-        } catch {
-          // thumbnail is optional
-        }
-        let socialThumbnailStorageId: Id<"_storage"> | undefined;
-        if (socialThumb) {
-          try {
-            const socialUrl = await getUploadUrl();
-            socialThumbnailStorageId = (await uploadBlob(socialUrl, socialThumb)) as Id<"_storage">;
-          } catch {
-            // the play-button poster is optional
-          }
-        }
 
-        await completeProcessing({
-          videoId: prepared.videoId,
-          thumbnailStorageId,
-          socialThumbnailStorageId,
+        await completeVideoUpload(prepared.videoId, {
           duration: meta.duration,
           width: meta.width,
           height: meta.height,
           codec: meta.codec,
           bitrate: meta.bitrate,
-          fps: undefined,
+          thumbnail: thumb,
+          socialThumbnail: socialThumb,
         });
 
         setRun((r) =>
-          r
-            ? { ...r, phase: "done", detail: "Ready", publicId: prepared.publicId }
-            : r,
+          r ? { ...r, phase: "done", detail: "Ready", publicId: prepared.publicId } : r,
         );
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -286,31 +175,18 @@ export default function Upload() {
           if (/storage limit|500 MB/i.test(message)) {
             setUpgradeOpen(true);
           }
+          if (videoIdRef.current) {
+            try {
+              await markFailed({ videoId: videoIdRef.current, error: message });
+            } catch {
+              // the row may already be gone
+            }
+          }
           setRun((r) => (r ? { ...r, phase: "error", error: message } : r));
         }
       }
     },
-    [
-      run,
-      title,
-      maxBytes,
-      plan,
-      limitBytes,
-      usedBytes,
-      t,
-      prepareUpload,
-      putBlob,
-      checkMuxUpload,
-      markFailed,
-      uploadBlob,
-      extractMetadata,
-      generateThumbnail,
-      generateSocialThumbnail,
-      finalizeUpload,
-      getUploadUrl,
-      completeProcessing,
-      attachSocialThumb,
-    ],
+    [run, title, maxBytes, plan, limitBytes, usedBytes, t, prepareUpload, markFailed],
   );
 
   const cancel = async () => {
@@ -377,15 +253,9 @@ export default function Upload() {
             <div>
               <CardTitle>{t("upload.title")}</CardTitle>
               <CardDescription>
-                {backend === "mux" ? (
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="size-3.5" /> {t("upload.descMux")}
-                  </span>
-                ) : (
-                  <span>
-                    {t("upload.descBrowser", { size: formatBytes(maxBytes) })}
-                  </span>
-                )}
+                <span>
+                  {t("upload.descBrowser", { size: formatBytes(maxBytes) })}
+                </span>
               </CardDescription>
             </div>
           </div>
@@ -485,11 +355,11 @@ export default function Upload() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{run.fileName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {run.backend === "mux" ? t("upload.muxPipeline") : t("upload.browserPipeline")} ·{" "}
+                    {t("upload.browserPipeline")} ·{" "}
                     {formatBytes(run.sizeBytes)}
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={cancel} disabled={run.phase === "processing" && run.backend === "mux"}>
+                <Button variant="ghost" size="sm" onClick={cancel}>
                   {t("upload.cancel")}
                 </Button>
               </div>
@@ -523,9 +393,7 @@ export default function Upload() {
         </div>
         <div className="rounded-lg border p-3">
           <p className="font-medium text-foreground">{t("upload.step2")}</p>
-          <p className="mt-1">
-            {backend === "mux" ? t("upload.step2Mux") : t("upload.step2Browser")}
-          </p>
+          <p className="mt-1">{t("upload.step2Browser")}</p>
         </div>
         <div className="rounded-lg border p-3">
           <p className="font-medium text-foreground">{t("upload.step3")}</p>

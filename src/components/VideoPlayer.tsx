@@ -18,7 +18,6 @@
  */
 import { AdManager, type AdsConfig } from "@/components/AdManager";
 import { copyText } from "@/components/CopyButton";
-import { api } from "@/convex/_generated/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +31,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useMutation } from "convex/react";
+import { useApiMutation } from "@/hooks/use-api";
 import Hls from "hls.js";
 import {
   AlertTriangle,
@@ -59,7 +58,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Accent colors for the custom player skin. Keys must stay in sync with
- * PLAYER_ACCENT_KEYS in src/convex/lib/settingsDefaults.ts.
+ * PLAYER_ACCENT_KEYS in server/types.ts.
  */
 export const PLAYER_ACCENTS: Record<
   string,
@@ -192,7 +191,7 @@ export function VideoPlayer({
   const [speed, setSpeed] = useState(() => userPrefs?.defaultSpeed ?? 1);
   const [levels, setLevels] = useState<Array<{ height?: number; width?: number }>>([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
-  const recordView = useMutation(api.views.recordView);
+  const recordView = useApiMutation("views/recordView");
   const { t } = useI18n();
 
   const isReady = video.status === "ready";

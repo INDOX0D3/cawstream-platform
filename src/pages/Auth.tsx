@@ -16,10 +16,11 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
-import { api } from "@/convex/_generated/api";
+import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiMutation, useApiQuery } from "@/hooks/use-api";
 import { LanguageSwitcher, useI18n } from "@/lib/i18n";
-import { useConvex, useMutation, useQuery } from "convex/react";
+import type { PublicConfig, User } from "@/lib/types";
 import {
   ArrowLeft,
   ArrowRight,
@@ -50,11 +51,9 @@ function resolveRedirectAfterAuth(returnTo: string | null, fallback = "/dashboar
   return fallback;
 }
 
-/** Turn a Convex auth error into a clean, human-readable message. Convex
- *  errors arrive as "[CONVEX A(auth:signIn)] [Request ID: …] Server Error …"
- *  — we strip that noise and map known failure modes to friendly copy, so
- *  internal error IDs are never shown to the user. Anything unrecognized
- *  falls back to the per-call fallback message. */
+/** Turn an API error into a clean, human-readable message. The server already
+ *  returns friendly copy; this maps known failure modes to translations and
+ *  never leaks internal error details. */
 function friendlyAuthError(
   err: unknown,
   fallback: string,
@@ -62,7 +61,6 @@ function friendlyAuthError(
 ): string {
   const raw = err instanceof Error && err.message ? err.message : "";
   const clean = raw
-    .replace(/\[CONVEX\s+[^\]]*\]/g, " ")
     .replace(/\[Request ID:\s*[^\]]*\]/g, " ")
     .replace(/^Server Error\s*/i, "")
     .replace(/\s+/g, " ")
@@ -80,10 +78,10 @@ function friendlyAuthError(
   if (/too many failed attempts|rate limit/.test(lower)) {
     return t("auth.tooManyAttempts");
   }
-  if (/deleted/.test(lower)) {
-    return t("auth.accountDeleted");
+  if (/already registered|already exists/.test(lower)) {
+    return t("auth.alreadyExists");
   }
-  return fallback;
+  return clean || fallback;
 }
 
 type Step =
@@ -93,12 +91,12 @@ type Step =
   | {
       mode: "verify";
       email: string;
-      password: string;
       isNewUser: boolean;
       username?: string;
+      devCode?: string;
     }
   | { mode: "forgot" }
-  | { mode: "reset"; email: string };
+  | { mode: "reset"; email: string; devCode?: string };
 
 const BULLETS = [
   { icon: Zap, title: "auth.bullet1Title", text: "auth.bullet1Text" },
@@ -107,11 +105,10 @@ const BULLETS = [
 ] as const;
 
 function Auth({ redirectAfterAuth }: AuthProps = {}) {
-  const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
+  const { isLoading: authLoading, isAuthenticated, refresh } = useAuth();
   const { t } = useI18n();
-  const convex = useConvex();
-  const completeSignup = useMutation(api.users.completeSignup);
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const completeSignup = useApiMutation("users/completeSignup");
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const siteName = siteConfig?.site.name || "Vidood Stream";
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -146,12 +143,10 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
     try {
-      const result = await signIn("password", { flow: "signIn", email, password });
-      if (!result.signingIn) {
-        setStep({ mode: "verify", email, password, isNewUser: false });
-        setOtp("");
-      }
+      await apiFetch<{ ok: boolean; user: User }>("/api/m/auth/login", { email, password });
+      refresh();
       setIsLoading(false);
+      // navigation happens via the authenticated effect
     } catch (err) {
       fail(err, "Sign-in failed. Check your email and password.");
     }
@@ -186,11 +181,8 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       return;
     }
 
-    // Convex Auth does not reject a signUp with an existing email — it just
-    // re-sends a verification code for the old account. Check first and tell
-    // the user their email is already registered, suggesting to sign in.
     try {
-      const registered = await convex.query(api.users.isEmailRegistered, { email });
+      const registered = await apiFetch<boolean>("/api/q/users/isEmailRegistered", { email });
       if (registered) {
         setSuggestSignIn(true);
         setError(t("auth.alreadyExists"));
@@ -198,18 +190,21 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
         return;
       }
     } catch {
-      // Check failed — let the auth flow decide (it may error on its own).
+      // Check failed — let the register call decide (it errors on its own).
     }
 
     try {
-      await signIn("password", {
-        flow: "signUp",
+      const result = await apiFetch<{ ok: boolean; delivery: string; devCode?: string }>(
+        "/api/m/auth/register",
+        { email, password, username, name: name || username },
+      );
+      setStep({
+        mode: "verify",
         email,
-        password,
+        isNewUser: true,
         username,
-        name: name || username,
+        devCode: result.devCode,
       });
-      setStep({ mode: "verify", email, password, isNewUser: true, username });
       setOtp("");
       setIsLoading(false);
     } catch (err) {
@@ -230,28 +225,23 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await signIn("password", {
-        flow: "email-verification",
+      const result = await apiFetch<{ ok: boolean; user: User }>("/api/m/auth/verify", {
         email: step.email,
         code: otp,
       });
-      if (result.signingIn) {
-        if (step.isNewUser && step.username) {
-          try {
-            await completeSignup({ username: step.username });
-          } catch (err) {
-            toast.error(
-              err instanceof Error ? err.message : "Could not finalize your username.",
-            );
-          }
+      void result;
+      if (step.isNewUser && step.username) {
+        try {
+          await completeSignup({ username: step.username });
+        } catch (err) {
+          toast.error(
+            err instanceof Error ? err.message : "Could not finalize your username.",
+          );
         }
-        setIsLoading(false);
-        // navigation happens via the authenticated effect
-      } else {
-        setError("That code is invalid or has expired.");
-        setOtp("");
-        setIsLoading(false);
       }
+      refresh();
+      setIsLoading(false);
+      // navigation happens via the authenticated effect
     } catch (err) {
       fail(err, "That code is invalid or has expired.");
       setOtp("");
@@ -263,7 +253,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setIsLoading(true);
     setError(null);
     try {
-      await signIn("password", { flow: "signIn", email: step.email, password: step.password });
+      const result = await apiFetch<{ ok: boolean; delivery: string; devCode?: string }>(
+        "/api/m/auth/resend",
+        { email: step.email, purpose: "verify" },
+      );
+      if (result.devCode) {
+        setStep({ ...step, devCode: result.devCode });
+      }
       toast.success(t("auth.newCode"));
     } catch (err) {
       fail(err, "Could not resend the code.");
@@ -280,12 +276,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "").trim().toLowerCase();
     try {
-      const result = await signIn("password", { flow: "reset", email });
-      void result;
-      setStep({ mode: "reset", email });
+      const result = await apiFetch<{ ok: boolean; devCode?: string }>("/api/m/auth/forgot", {
+        email,
+      });
+      setStep({ mode: "reset", email, devCode: result.devCode });
       setOtp("");
       setIsLoading(false);
-    } catch (err) {
+    } catch {
       // Never confirm whether an email exists — same message either way.
       setError("If that email exists, a reset code has been sent.");
       setIsLoading(false);
@@ -311,21 +308,15 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
       return;
     }
     try {
-      const result = await signIn("password", {
-        flow: "reset-verification",
+      await apiFetch("/api/m/auth/reset", {
         email: step.email,
         code: otp,
         newPassword,
       });
-      if (!result.signingIn) {
-        setError("That code is invalid or has expired.");
-        setOtp("");
-        setIsLoading(false);
-      } else {
-        toast.success(t("auth.verifiedSignedIn"));
-        setIsLoading(false);
-        // navigation happens via the authenticated effect
-      }
+      toast.success(t("auth.verifiedSignedIn"));
+      refresh();
+      setIsLoading(false);
+      // navigation happens via the authenticated effect
     } catch (err) {
       fail(err, "That code is invalid or has expired.");
       setOtp("");
@@ -337,7 +328,13 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     setIsLoading(true);
     setError(null);
     try {
-      await signIn("password", { flow: "reset", email: step.email });
+      const result = await apiFetch<{ ok: boolean; devCode?: string }>("/api/m/auth/resend", {
+        email: step.email,
+        purpose: "reset",
+      });
+      if (result.devCode) {
+        setStep({ ...step, devCode: result.devCode });
+      }
       toast.success(t("auth.newCode"));
     } catch {
       setError("Could not resend the code.");
@@ -628,6 +625,17 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
+                  {step.devCode && (
+                    <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-sm">
+                      <p className="font-medium text-amber-600">SMTP belum dikonfigurasi</p>
+                      <p className="mt-1 text-xs text-amber-700/90">
+                        Kode verifikasi (mode pengembangan):{" "}
+                        <span className="font-mono font-semibold">{step.devCode}</span>
+                        <br />
+                        Konfigurasikan SMTP di Admin → SMTP setelah masuk.
+                      </p>
+                    </div>
+                  )}
                   {error && (
                     <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-center text-sm text-destructive">
                       {error}
@@ -696,7 +704,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                   )}
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" />
                     ) : (
                       <>
                         {t("auth.sendReset")}
@@ -750,6 +758,15 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
+                  {step.devCode && (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-center text-sm">
+                      <p className="font-medium text-amber-600">SMTP belum dikonfigurasi</p>
+                      <p className="mt-1 text-xs text-amber-700/90">
+                        Kode reset (mode pengembangan):{" "}
+                        <span className="font-mono font-semibold">{step.devCode}</span>
+                      </p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="new-password">{t("auth.newPasswordField")}</Label>
                     <div className="relative">
@@ -790,7 +807,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </p>
                   )}
                   <Button type="submit" className="w-full" disabled={isLoading || otp.length !== 6}>
-                    {isLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : t("auth.updatePassword")}
+                    {isLoading ? <Loader2 className="size-4 animate-spin" /> : t("auth.updatePassword")}
                   </Button>
                 </CardContent>
                 <CardFooter className="justify-center border-t pt-4">

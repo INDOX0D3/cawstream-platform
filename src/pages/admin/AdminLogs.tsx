@@ -1,8 +1,8 @@
 import { PageHeader } from "@/components/layout/Shell";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/convex/_generated/api";
+import { useApiQuery } from "@/hooks/use-api";
 import { formatDateTime } from "@/lib/format";
-import { useQuery } from "convex/react";
+import type { LogEntry } from "@/lib/types";
 import { Loader2, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +12,8 @@ const LEVEL_STYLES: Record<string, string> = {
   error: "bg-red-500/15 text-red-700 dark:text-red-300",
 };
 
-type LogRow = NonNullable<ReturnType<typeof useQuery<typeof api.admin.listLogs>>>[number];
-
 export default function AdminLogs() {
-  const logs = useQuery(api.admin.listLogs);
+  const logs = useApiQuery<LogEntry[]>("admin/listLogs");
 
   if (logs === undefined) {
     return (
@@ -40,7 +38,7 @@ export default function AdminLogs() {
           </div>
         ) : (
           <div className="divide-y">
-            {logs.map((log: LogRow) => (
+            {logs.map((log: LogEntry) => (
               <div key={log._id} className="flex items-start gap-3 px-4 py-3">
                 <Badge
                   variant="outline"

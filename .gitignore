@@ -1,4 +1,11 @@
+.env
 .env.local
 node_modules
 dist
-src/convex/_generated
+
+# Self-hosted backend data
+data/
+storage/
+*.db
+*.db-shm
+*.db-wal

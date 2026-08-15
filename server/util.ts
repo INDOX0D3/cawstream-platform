@@ -1,14 +1,64 @@
 /**
- * Server-side validation rules.
- *
- * Uploads are validated on size, declared MIME type and file name — the
- * client additionally verifies the file's magic bytes before upload, and the
- * stored blob's content type is recorded server-side from the upload request.
- * Ad code is validated for length and rendered only inside the player/embed
- * context (see AdManager), never in dashboards or admin pages.
+ * Utility helpers: public video ids, password hashing (scrypt), sha256 and
+ * server-side validation — ported 1:1 from the previous Convex lib so the
+ * rules and behavior stay identical.
  */
 
-export const ALLOWED_VIDEO_EXTENSIONS = ["mp4", "mov", "mkv", "webm"] as const;
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+
+// ---------------------------------------------------------------------------
+// Public ids
+// ---------------------------------------------------------------------------
+
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0, O, 1, I, l
+const ALPHABET_LENGTH = ALPHABET.length;
+
+export function generatePublicId(length = 8): string {
+  let out = "";
+  while (out.length < length) {
+    const bytes = randomBytes(2);
+    const b = bytes[0] + bytes[1] * 256;
+    if (b >= ALPHABET_LENGTH * Math.floor(65536 / ALPHABET_LENGTH)) continue;
+    out += ALPHABET[b % ALPHABET_LENGTH];
+  }
+  return out;
+}
+
+export function isValidPublicId(id: string): boolean {
+  return /^[A-HJ-NP-Z2-9]{8}$/.test(id);
+}
+
+export function sha256Hex(input: string): string {
+  return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+// ---------------------------------------------------------------------------
+// Passwords (scrypt — same primitive the previous Convex Auth used)
+// ---------------------------------------------------------------------------
+
+const SCRYPT_KEYLEN = 64;
+
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, SCRYPT_KEYLEN) as Buffer;
+  return `scrypt:${salt}:${hash.toString("hex")}`;
+}
+
+export function verifyPassword(stored: string, password: string): boolean {
+  try {
+    const [scheme, salt, hex] = stored.split(":");
+    if (scheme !== "scrypt" || !salt || !hex) return false;
+    const expected = Buffer.from(hex, "hex");
+    const actual = scryptSync(password, salt, SCRYPT_KEYLEN);
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Validation (ported from src/convex/lib/validation.ts)
+// ---------------------------------------------------------------------------
 
 export const ALLOWED_VIDEO_MIME_TYPES = [
   "video/mp4",
@@ -17,13 +67,10 @@ export const ALLOWED_VIDEO_MIME_TYPES = [
   "video/webm",
 ] as const;
 
-export type AllowedVideoMime = (typeof ALLOWED_VIDEO_MIME_TYPES)[number];
-
-export function isAllowedVideoMime(mime: string): mime is AllowedVideoMime {
+export function isAllowedVideoMime(mime: string): boolean {
   return (ALLOWED_VIDEO_MIME_TYPES as readonly string[]).includes(mime);
 }
 
-/** Strip path separators / weird chars from a user-supplied file name. */
 export function sanitizeFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "video";
   const cleaned = base.replace(/[^\w.\- ]/g, "").trim();
@@ -38,7 +85,6 @@ export function sanitizeDescription(description: string): string {
   return description.trim().slice(0, 2000);
 }
 
-/** Max length for pasted advertisement code. */
 export const MAX_AD_CODE_LENGTH = 10_000;
 export const MAX_AD_URL_LENGTH = 2_048;
 
@@ -51,7 +97,6 @@ export interface AdSettingsInput {
   socialBarCode?: string;
   popunderEnabled: boolean;
   popunderCode?: string;
-  /** "session" = once per browsing session (default), "always" = every click. */
   frequency?: AdFrequency;
 }
 
@@ -77,14 +122,11 @@ function validateAdCode(value: string | undefined, label: string): string {
   if (!value) return "";
   const code = value.trim();
   if (code.length > MAX_AD_CODE_LENGTH) {
-    throw new Error(
-      `${label} is too long (max ${MAX_AD_CODE_LENGTH} characters).`,
-    );
+    throw new Error(`${label} is too long (max ${MAX_AD_CODE_LENGTH} characters).`);
   }
   return code;
 }
 
-/** Validate + normalize advertisement settings before persisting. */
 export function validateAdSettings(input: AdSettingsInput): AdSettingsInput {
   return {
     smartlinkEnabled: Boolean(input.smartlinkEnabled),
@@ -97,16 +139,6 @@ export function validateAdSettings(input: AdSettingsInput): AdSettingsInput {
   };
 }
 
-export interface Limits {
-  maxUploadBytes: number;
-  allowedTypes: readonly string[];
-}
-
-export const DEFAULT_LIMITS: Limits = {
-  maxUploadBytes: 1024 * 1024 * 1024, // 1 GB
-  allowedTypes: ALLOWED_VIDEO_MIME_TYPES,
-};
-
 export function maskSecret(secret: string | undefined): string {
   if (!secret) return "";
   return secret.length <= 4 ? "••••" : `••••${secret.slice(-4)}`;
@@ -114,4 +146,8 @@ export function maskSecret(secret: string | undefined): string {
 
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export function isValidUsername(username: string): boolean {
+  return /^[a-zA-Z0-9_]{3,24}$/.test(username);
 }

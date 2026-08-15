@@ -1,35 +1,31 @@
 #!/usr/bin/env bash
 # =============================================================================
-# CawStream — one-shot VPS setup script (Ubuntu/Debian)
+# Vidood Stream — one-shot VPS setup script (Ubuntu/Debian), no Convex.
 #
 # What it does:
 #   1. Installs Bun (if missing) and nginx (if missing).
-#   2. Optionally installs Docker + Compose (for the docker path).
-#   3. Copies deploy/env.example → .env and asks you to fill in VITE_CONVEX_URL.
-#   4. Installs npm dependencies.
-#   5. Deploys the Convex backend:  bunx convex deploy
-#   6. Builds the frontend:        bun run build   (needs VITE_CONVEX_URL set)
-#   7. Path A (Docker)  — builds & runs the image with `docker compose up -d`.
-#   8. Path B (nginx)   — copies dist/ to /var/www/cawstream, installs the
-#                         nginx site, and (optionally) enables HTTPS via certbot.
+#   2. Copies deploy/env.example → .env (edit before running again).
+#   3. Installs dependencies and builds the frontend (bun run build).
+#   4. Installs a systemd service for the backend (bun run server/index.ts).
+#   5. Installs the nginx site (reverse proxy → 127.0.0.1:8787) and,
+#      optionally, HTTPS via certbot.
 #
 # Usage:
 #   sudo bash deploy/vps-install.sh
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/cawstream}"
-DOMAIN="${DOMAIN:-}"          # e.g. cawstream.example.com (optional)
-MODE="${MODE:-ask}"           # ask | docker | nginx
+APP_DIR="${APP_DIR:-/opt/vidood}"
+DOMAIN="${DOMAIN:-}"          # e.g. vidood.example.com (optional)
 YELLOW='\033[1;33m'; GREEN='\033[1;32m'; NC='\033[0m'
-say()  { echo -e "${GREEN}[cawstream]${NC} $*"; }
-warn() { echo -e "${YELLOW}[cawstream]${NC} $*"; }
+say()  { echo -e "${GREEN}[vidood]${NC} $*"; }
+warn() { echo -e "${YELLOW}[vidood]${NC} $*"; }
 
 [[ $EUID -eq 0 ]] || { warn "Jalankan sebagai root: sudo bash deploy/vps-install.sh"; exit 1; }
 
 # ---- 1. Repo location -------------------------------------------------------
 if [[ ! -d "$APP_DIR" ]]; then
-  read -rp "Folder proyek belum ada. Path untuk clone proyek ini [$APP_DIR]: " APP_DIR_IN
+  read -rp "Folder proyek belum ada. Path untuk proyek ini [$APP_DIR]: " APP_DIR_IN
   APP_DIR="${APP_DIR_IN:-$APP_DIR}"
   mkdir -p "$APP_DIR"
   warn "Salin seluruh source project ini ke $APP_DIR (mis. via git clone / scp), lalu jalankan ulang script."
@@ -43,6 +39,7 @@ if ! command -v bun >/dev/null 2>&1; then
   curl -fsSL https://bun.sh/install | bash
   export PATH="$HOME/.bun/bin:$PATH"
 fi
+BUN_BIN="$(command -v bun)"
 
 # ---- 3. Install nginx -------------------------------------------------------
 if ! command -v nginx >/dev/null 2>&1; then
@@ -50,68 +47,65 @@ if ! command -v nginx >/dev/null 2>&1; then
   apt-get update -qq && apt-get install -y -qq nginx
 fi
 
-# ---- 4. Docker (opsional, hanya untuk mode docker) --------------------------
-if [[ "$MODE" == "ask" ]]; then
-  read -rp "Pakai Docker untuk serving? [y/N]: " USE_DOCKER
-  [[ "${USE_DOCKER,,}" == "y" ]] && MODE=docker || MODE=nginx
-fi
-
-if [[ "$MODE" == "docker" ]] && ! command -v docker >/dev/null 2>&1; then
-  say "Menginstal Docker + Compose plugin…"
-  apt-get install -y -qq ca-certificates curl gnupg
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
-  apt-get update -qq && apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
-  systemctl enable --now docker
-fi
-
-# ---- 5. .env ----------------------------------------------------------------
+# ---- 4. .env ----------------------------------------------------------------
 if [[ ! -f .env ]]; then
   cp deploy/env.example .env
-  warn "Isi VITE_CONVEX_URL di file .env (URL deployment Convex kamu), lalu jalankan ulang script."
-  warn "Lihat DEPLOY.md untuk cara membuat project Convex & mendapatkan URL deployment."
-  exit 0
-fi
-set -a; source .env; set +a
-if [[ -z "${VITE_CONVEX_URL:-}" ]]; then
-  warn "VITE_CONVEX_URL kosong di .env — isi dulu lalu jalankan ulang."; exit 1
+  warn "File .env sudah dibuat dari template. Sesuaikan PORT/STORAGE_DIR/dll bila perlu, lalu jalankan ulang script."
 fi
 
-# ---- 6. Dependencies + backend deploy --------------------------------------
+# ---- 5. Dependencies + build ------------------------------------------------
 say "Menginstal dependencies…"
 bun install
 
-say "Mendeploy fungsi Convex (backend)…"
-bunx convex deploy
-
-# ---- 7. Frontend build ------------------------------------------------------
-say "Membangun frontend dengan VITE_CONVEX_URL=$VITE_CONVEX_URL …"
+say "Membangun frontend…"
 bun run build
 
-# ---- 8. Serving -------------------------------------------------------------
-if [[ "$MODE" == "docker" ]]; then
-  say "Menjalankan container (docker compose up -d --build)…"
-  docker compose up -d --build
-  say "Selesai! Aplikasi live di http://<IP_VPS>:80 (pasang reverse proxy nginx + HTTPS untuk produksi)."
-else
-  say "Memasang build ke /var/www/cawstream …"
-  rm -rf /var/www/cawstream
-  cp -r dist /var/www/cawstream
-  install -m 644 deploy/nginx-site.conf /etc/nginx/sites-available/cawstream
-  ln -sf /etc/nginx/sites-available/cawstream /etc/nginx/sites-enabled/cawstream
-  rm -f /etc/nginx/sites-enabled/default
-  nginx -t && systemctl reload nginx
+# ---- 6. systemd service -----------------------------------------------------
+SERVICE_NAME="vidood"
+say "Memasang systemd service ($SERVICE_NAME)…"
+cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
+[Unit]
+Description=Vidood Stream server
+After=network.target
 
-  if [[ -n "$DOMAIN" ]]; then
-    sed -i "s/example.com/$DOMAIN/g" /etc/nginx/sites-available/cawstream
-    nginx -t && systemctl reload nginx
-    if command -v certbot >/dev/null 2>&1 || apt-get install -y -qq certbot python3-certbot-nginx; then
-      say "Mengaktifkan HTTPS via certbot…"
-      certbot --nginx -d "$DOMAIN" --redirect --agree-tos --register-unsafely-without-email
-    fi
-  fi
-  say "Selesai! Aplikasi live di http://<IP_VPS> (atau https://$DOMAIN jika domain diisi)."
+[Service]
+WorkingDirectory=$APP_DIR
+ExecStart=$BUN_BIN run server/index.ts
+Restart=always
+RestartSec=3
+EnvironmentFile=$APP_DIR/.env
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now $SERVICE_NAME
+sleep 2
+if ! systemctl is-active --quiet $SERVICE_NAME; then
+  warn "Service $SERVICE_NAME tidak aktif — cek: journalctl -u $SERVICE_NAME -f"
 fi
 
-say "Langkah terakhir: buka app → Admin → SMTP dan konfigurasikan SMTP Anda agar email OTP terkirim."
+# ---- 7. nginx site ----------------------------------------------------------
+say "Memasang nginx site…"
+install -m 644 deploy/nginx-site.conf /etc/nginx/sites-available/$SERVICE_NAME
+rm -f /etc/nginx/sites-enabled/$SERVICE_NAME
+ln -sf /etc/nginx/sites-available/$SERVICE_NAME /etc/nginx/sites-enabled/$SERVICE_NAME
+rm -f /etc/nginx/sites-enabled/default
+
+if [[ -n "$DOMAIN" ]]; then
+  sed -i "s/example.com/$DOMAIN/g" /etc/nginx/sites-available/$SERVICE_NAME
+fi
+nginx -t && systemctl reload nginx
+
+if [[ -n "$DOMAIN" ]]; then
+  if command -v certbot >/dev/null 2>&1 || apt-get install -y -qq certbot python3-certbot-nginx; then
+    say "Mengaktifkan HTTPS via certbot…"
+    certbot --nginx -d "$DOMAIN" --redirect --agree-tos --register-unsafely-without-email
+  fi
+fi
+
+say "Selesai! Aplikasi live di http://<IP_VPS> (atau https://$DOMAIN jika domain diisi)."
+say "Langkah berikutnya:"
+say "  1. Daftar akun pertama (otomatis jadi admin)."
+say "  2. Admin → SMTP: isi SMTP Anda dan klik 'Send test email' sampai hijau."
+say "  3. Sebelum SMTP aktif, kode OTP muncul di: journalctl -u $SERVICE_NAME -f"

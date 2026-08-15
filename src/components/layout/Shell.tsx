@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { UpgradeDialog } from "@/components/UpgradeDialog";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiQuery } from "@/hooks/use-api";
 import { LanguageSwitcher, useI18n, type DictKey } from "@/lib/i18n";
-import { useQuery } from "convex/react";
+import type { PublicConfig } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   Clapperboard,
@@ -193,7 +193,7 @@ function ShellFrame({
 }) {
   const { user, signOut, isLoading } = useAuth();
   const { t } = useI18n();
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const siteName = siteConfig?.site.name || "Vidood Stream";
   const navigate = useNavigate();
   const location = useLocation();

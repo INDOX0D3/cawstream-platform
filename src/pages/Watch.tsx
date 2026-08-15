@@ -3,34 +3,82 @@ import { VideoCard } from "@/components/VideoCard";
 import { Logo } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { VideoPlayer, type PlayerUserPrefs } from "@/components/VideoPlayer";
-import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useApiQuery } from "@/hooks/use-api";
 import { embedCode, videoUrls } from "@/lib/embed";
 import { formatCompact, formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { applyVideoMeta } from "@/lib/seo";
-import { useQuery } from "convex/react";
+import type { PublicConfig, RelatedVideo } from "@/lib/types";
 import { motion } from "framer-motion";
 import { Eye, LayoutDashboard, Link2, Loader2, PlayCircle, Sparkles, UserRound } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 
-type RelatedVideo = NonNullable<
-  ReturnType<typeof useQuery<typeof api.videos.listMoreFrom>>
->[number];
+type WatchPayload = {
+  video: {
+    _id: string;
+    publicId: string;
+    title: string;
+    status: string;
+    error: string | null;
+    duration: number | null;
+    width: number | null;
+    height: number | null;
+    playbackType: "direct" | "hls" | null;
+    muxPlaybackId: string | null;
+    directUrl: string | null;
+    thumbnailUrl: string | null;
+    posterUrl: string | null;
+    views: number;
+    createdAt: number;
+  };
+  ads: {
+    smartlinkEnabled: boolean;
+    smartlinkUrl: string;
+    socialBarEnabled: boolean;
+    socialBarCode: string;
+    popunderEnabled: boolean;
+    popunderCode: string;
+    frequency: "session" | "always";
+  };
+  player: {
+    aspectRatio: string;
+    defaultQuality: string;
+    autoplay: boolean;
+    controls: boolean;
+    pictureInPicture: boolean;
+    defaultVolume: number;
+    showBranding: boolean;
+    accentColor: string;
+  };
+  branding: {
+    watermarkEnabled: boolean;
+    watermarkText: string;
+    watermarkLogoUrl: string;
+    watermarkPosition: string;
+    watermarkSize: number;
+    watermarkOpacity: number;
+    watermarkMargin: number;
+  };
+  site: { name: string; supportEmail: string };
+  owner: { name: string; username: string };
+};
 
 export default function Watch() {
   const { publicId = "" } = useParams();
   const { isAuthenticated } = useAuth();
   const { t } = useI18n();
-  const payload = useQuery(api.videos.getWatch, { publicId });
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const payload = useApiQuery<WatchPayload | null>("videos/getWatch", { publicId });
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const siteName = siteConfig?.site.name || "Vidood Stream";
-  const related = useQuery(api.videos.listMoreFrom, { publicId });
-  const personal = useQuery(
-    api.playerPrefs.getMyPlayerSettings,
-    isAuthenticated ? {} : "skip",
-  );
+  const related = useApiQuery<RelatedVideo[]>("videos/listMoreFrom", { publicId });
+  const personal = useApiQuery<{
+    autoplay: boolean;
+    defaultVolume: number;
+    defaultSpeed: number;
+    showWatermark: boolean;
+  }>("playerPrefs/getMyPlayerSettings", isAuthenticated ? {} : "skip");
 
   const userPrefs: PlayerUserPrefs | undefined = personal
     ? {
@@ -170,7 +218,7 @@ export default function Watch() {
               {t("watch.moreFrom", { user: owner.name })}
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {related.map((item: RelatedVideo) => (
+              {related.map((item) => (
                 <VideoCard
                   key={item._id}
                   video={item}

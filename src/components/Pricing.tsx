@@ -5,10 +5,10 @@
  */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { api } from "@/convex/_generated/api";
+import { useApiQuery } from "@/hooks/use-api";
 import { useI18n, type DictKey } from "@/lib/i18n";
 import { PLAN_IDS, telegramSubscribeLink, type PlanId } from "@/lib/plans";
-import { useQuery } from "convex/react";
+import type { PublicConfig } from "@/lib/types";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +66,7 @@ export function PricingCards({
   compact?: boolean;
 }) {
   const { t } = useI18n();
-  const siteConfig = useQuery(api.settings.getPublicConfig);
+  const siteConfig = useApiQuery<PublicConfig>("settings/getPublicConfig");
   const siteName = siteConfig?.site.name || "Vidood Stream";
 
   return (
