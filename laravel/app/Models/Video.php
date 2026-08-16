@@ -125,7 +125,7 @@ class Video extends Model
     public function getHlsMasterUrlAttribute(): ?string
     {
         return $this->hls_path
-            ? route('video.hls', $this->public_id)
+            ? route('video.hls', [$this->public_id, 'master.m3u8'])
             : null;
     }
 

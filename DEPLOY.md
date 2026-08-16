@@ -1,5 +1,17 @@
 # Deploy Vidood Stream di VPS (tanpa Convex — backend sendiri)
 
+> **Versi produksi yang disarankan adalah aplikasi Laravel di folder `laravel/`.**
+> Deploy-nya: `sudo bash laravel/install.sh` (Ubuntu 22.04/24.04) atau wizard web
+> `/install`. Dokumentasi lengkap ada di `laravel/INSTALL.md`,
+> `laravel/DEPLOYMENT.md`, dan `laravel/TROUBLESHOOTING.md`.
+>
+> Dokumen di bawah ini menjelaskan **versi lama (React + Bun + SQLite)** dan
+> hanya relevan jika kamu masih menjalankan stack lama tersebut.
+
+---
+
+# Versi lama — React + Bun + SQLite
+
 Aplikasi ini **sepenuhnya self-hosted** — tidak ada Convex, tidak ada backend pihak
 ketiga. Semuanya jalan di VPS kamu:
 

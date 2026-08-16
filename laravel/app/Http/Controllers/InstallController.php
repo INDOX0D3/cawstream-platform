@@ -149,7 +149,23 @@ class InstallController extends Controller
 
     private function binaryExists(string $path): bool
     {
-        return $path !== '' && (is_executable($path) || str_contains($path, '/'));
+        if ($path === '') {
+            return false;
+        }
+
+        if (is_executable($path)) {
+            return true;
+        }
+
+        // A bare command name (e.g. "ffmpeg"): resolve it through PATH.
+        if (! str_contains($path, '/')) {
+            $output = [];
+            exec('command -v '.escapeshellarg($path).' 2>/dev/null', $output, $code);
+
+            return $code === 0 && ! empty($output);
+        }
+
+        return false;
     }
 
     private function writeEnv(array $values): void

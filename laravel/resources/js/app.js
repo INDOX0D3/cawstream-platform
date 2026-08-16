@@ -261,6 +261,18 @@ Alpine.data('cawPlayer', (opts) => ({
                     .map((l, i) => ({ index: i, label: (l.height || 0) + 'p' }))
                     .filter((l) => l.label !== '0p');
             });
+            // If the HLS stream fails, fall back to the direct MP4 so the
+            // video never stays stuck.
+            this.hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+                if (!data.fatal || !this.hlsInstance) return;
+                this.hlsInstance.destroy();
+                this.hlsInstance = null;
+                this.hls = null;
+                this.quality = 'auto';
+                this.qualityLevels = [];
+                vid.src = this.src;
+                vid.load();
+            });
         }
 
         vid.addEventListener('loadedmetadata', () => {
@@ -336,7 +348,9 @@ Alpine.data('cawPlayer', (opts) => ({
     },
 
     handleClick(e) {
-        if (e.target.closest('[data-control]')) return;
+        // Ignore clicks on the custom controls, the center play button and
+        // any other interactive element so they never double-toggle playback.
+        if (e.target.closest('[data-control], button, input, a, select, textarea, iframe')) return;
         this.togglePlay();
     },
 

@@ -23,7 +23,6 @@ class EmbedController extends Controller
         return view('embed.show', [
             'video' => $video,
             'adSettings' => $user->adSettingsOrNew(),
-            'watermark' => $video->playback_type === null ? null : $user->watermarkOrNew(),
             'siteName' => site_name(),
         ]);
     }

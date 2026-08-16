@@ -132,6 +132,7 @@
     <div
         x-show="status === 'ready' && (playing || showControls)"
         x-transition.opacity
+        data-control
         class="absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-zinc-950/90 to-transparent px-4 pb-3 pt-10"
         @mousemove.stop
     >
