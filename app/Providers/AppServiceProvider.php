@@ -37,7 +37,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('upload', fn () => Limit::perMinute(120)->by(request()->ip()));
         RateLimiter::for('views', fn () => Limit::perMinute(120)->by(request()->ip()));
 
+        // Laravel 12 requires a name before withoutOverlapping().
         Schedule::call(fn () => CleanupTemporaryFilesJob::dispatchSync())
+            ->name('cleanup-temp-files')
             ->hourly()
             ->withoutOverlapping();
 
@@ -45,6 +47,9 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Support\Facades\DB::table('failed_jobs')
                 ->where('failed_at', '<', now()->subDays(30))
                 ->delete();
-        })->daily()->withoutOverlapping();
+        })
+            ->name('purge-failed-jobs')
+            ->daily()
+            ->withoutOverlapping();
     }
 }
