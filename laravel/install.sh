@@ -155,8 +155,6 @@ foreach ($replace as $key => $value) {
 file_put_contents($path, implode("\n", $lines) . "\n");
 ' "$APP_NAME" "$APP_URL" "$DB_NAME" "$DB_USER" "$DB_PASS"
 
-"$PHP_BIN" artisan key:generate --force
-
 # ---------------------------------------------------------------------------
 # 7. PHP dependencies + assets
 # ---------------------------------------------------------------------------
@@ -174,7 +172,9 @@ npm run build
 # ---------------------------------------------------------------------------
 # 8. Migrations, storage link, admin
 # ---------------------------------------------------------------------------
-log "Running migrations..."
+log "Generating APP_KEY and running migrations..."
+# key:generate needs vendor/autoload.php, which composer install (step 7) created.
+"$PHP_BIN" artisan key:generate --force
 "$PHP_BIN" artisan migrate --force
 "$PHP_BIN" artisan storage:link
 
