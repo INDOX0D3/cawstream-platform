@@ -53,6 +53,36 @@ class InstallController extends Controller
         return back()->with('status', 'Application details saved.');
     }
 
+    public function smtp(Request $request): RedirectResponse
+    {
+        if ($request->has('skip')) {
+            session(['install.smtp' => ['skipped' => true]]);
+
+            return back()->with('status', 'SMTP skipped — configure it later under Admin → SMTP.');
+        }
+
+        $data = $request->validate([
+            'host' => ['nullable', 'string', 'max:255'],
+            'port' => ['nullable', 'integer', 'between:1,65535'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
+            'encryption' => ['nullable', 'in:tls,ssl,none'],
+            'sender_name' => ['nullable', 'string', 'max:255'],
+            'sender_email' => ['nullable', 'email', 'max:255'],
+        ]);
+
+        session(['install.smtp' => $data]);
+
+        return back()->with('status', 'SMTP settings saved — you can always change them in the admin panel.');
+    }
+
+    public function environment(Request $request): RedirectResponse
+    {
+        session(['install.env_seen' => true]);
+
+        return back()->with('status', 'Storage and queue confirmed.');
+    }
+
     public function admin(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -71,16 +101,19 @@ class InstallController extends Controller
         $db = session('install.db');
         $app = session('install.app');
         $admin = session('install.admin');
+        $smtp = session('install.smtp');
 
         if (! $db || ! $app || ! $admin) {
             return redirect()->route('install.index');
         }
 
-        $this->writeEnv([
+        $appUrl = rtrim($app['url'], '/');
+
+        $env = [
             'APP_NAME' => $app['name'],
             'APP_ENV' => 'production',
             'APP_DEBUG' => 'false',
-            'APP_URL' => rtrim($app['url'], '/'),
+            'APP_URL' => $appUrl,
             'APP_KEY' => 'base64:'.base64_encode(random_bytes(32)),
             'DB_CONNECTION' => 'mysql',
             'DB_HOST' => $db['host'],
@@ -88,7 +121,24 @@ class InstallController extends Controller
             'DB_DATABASE' => $db['database'],
             'DB_USERNAME' => $db['username'],
             'DB_PASSWORD' => $db['password'] ?? '',
-        ]);
+            'SESSION_SECURE_COOKIE' => str_starts_with($appUrl, 'https://') ? 'true' : 'false',
+            'QUEUE_CONNECTION' => 'database',
+            'CACHE_STORE' => 'database',
+            'FILESYSTEM_DISK' => 'local',
+        ];
+
+        if (is_array($smtp) && empty($smtp['skipped']) && ! empty($smtp['host'])) {
+            $env['MAIL_MAILER'] = 'smtp';
+            $env['MAIL_HOST'] = $smtp['host'];
+            $env['MAIL_PORT'] = (string) ($smtp['port'] ?? 587);
+            $env['MAIL_USERNAME'] = $smtp['username'] ?? '';
+            $env['MAIL_PASSWORD'] = $smtp['password'] ?? '';
+            $env['MAIL_ENCRYPTION'] = ($smtp['encryption'] ?? 'tls') === 'none' ? '' : ($smtp['encryption'] ?? 'tls');
+            $env['MAIL_FROM_ADDRESS'] = $smtp['sender_email'] ?: 'no-reply@'.parse_url($appUrl, PHP_URL_HOST);
+            $env['MAIL_FROM_NAME'] = $smtp['sender_name'] ?: $app['name'];
+        }
+
+        $this->writeEnv($env);
 
         $this->reloadEnvironment();
 
@@ -112,7 +162,7 @@ class InstallController extends Controller
 
         touch(storage_path('installed'));
 
-        session()->forget(['install.db', 'install.app', 'install.admin']);
+        session()->forget(['install.db', 'install.app', 'install.smtp', 'install.env_seen', 'install.admin']);
 
         return redirect()->route('install.complete');
     }

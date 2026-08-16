@@ -136,6 +136,8 @@ $replace = [
     "FFMPEG_PATH" => "/usr/bin/ffmpeg",
     "FFPROBE_PATH" => "/usr/bin/ffprobe",
     "VIDEO_MAX_UPLOAD_SIZE" => "5368709120",
+    // Secure cookies only make sense once HTTPS is enabled.
+    "SESSION_SECURE_COOKIE" => str_starts_with($argv[2], "https://") ? "true" : "false",
 ];
 $lines = file($path, FILE_IGNORE_NEW_LINES) ?: [];
 foreach ($lines as $i => $line) {

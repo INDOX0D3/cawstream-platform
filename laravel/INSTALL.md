@@ -45,8 +45,8 @@ If you prefer a wizard:
 1. Set up the server manually: install PHP 8.3 + extensions, Nginx, MariaDB, FFmpeg, Composer (see below).
 2. `composer install --no-dev` and `cp env.example .env`.
 3. Point your nginx document root at `public/` (template in `deploy/nginx.conf`).
-4. Open `https://your-domain/install` and follow: Requirements → Database → Application → Administrator → Install.
-5. The installer writes `.env`, runs migrations, creates the admin, and locks itself (`storage/installed`).
+4. Open `https://your-domain/install` and follow: Requirements → Database → Application → SMTP → Environment → Administrator → Install.
+5. The installer verifies PHP/extension/FFmpeg/FFprobe/storage writability, tests the database connection, writes `.env` (including SMTP if provided), runs migrations, creates the admin, and locks itself (`storage/installed`).
 
 ## Option C — fully manual
 

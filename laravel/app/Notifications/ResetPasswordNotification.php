@@ -26,8 +26,10 @@ class ResetPasswordNotification extends Notification
 
         return (new MailMessage)
             ->subject('['.site_name().'] '.t('auth.resetPassword'))
-            ->line(t('auth.resetDesc'))
-            ->action(t('auth.resetPassword'), $url)
-            ->line(t('auth.checkEmailDesc', ['email' => $notifiable->getEmailForPasswordReset()]));
+            ->view('emails.auth.reset-password', [
+                'siteName' => site_name(),
+                'user' => $notifiable,
+                'url' => $url,
+            ]);
     }
 }

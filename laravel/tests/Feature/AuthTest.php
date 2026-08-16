@@ -10,7 +10,7 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_first_registered_user_becomes_admin(): void
+    public function test_first_registered_user_becomes_admin_and_must_verify_email(): void
     {
         $response = $this->post('/register', [
             'name' => 'First Admin',
@@ -19,12 +19,15 @@ class AuthTest extends TestCase
             'password_confirmation' => 'secret123',
         ]);
 
-        $response->assertRedirect(route('dashboard'));
+        $response->assertRedirect(route('verification.notice'));
 
         $this->assertDatabaseHas('users', [
             'email' => 'admin@example.com',
             'role' => User::ROLE_ADMIN,
         ]);
+
+        // The dashboard stays locked until the email is verified.
+        $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
     }
 
     public function test_registration_with_existing_email_is_rejected(): void
@@ -90,6 +93,59 @@ class AuthTest extends TestCase
 
         $response->assertSessionHasErrors('email');
         $this->assertGuest();
+    }
+
+    public function test_unverified_user_is_blocked_from_dashboard(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertRedirect(route('verification.notice'));
+    }
+
+    public function test_verification_link_verifies_the_email(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+        $token = $user->generateVerificationToken();
+
+        $this->get(route('verification.verify', ['token' => $token]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertNotNull($user->refresh()->email_verified_at);
+        $this->assertNull($user->verification_token_hash);
+    }
+
+    public function test_expired_verification_token_is_rejected(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+        $token = $user->generateVerificationToken();
+
+        $user->forceFill(['verification_token_expires_at' => now()->subMinute()])->save();
+
+        $this->get(route('verification.verify', ['token' => $token]))
+            ->assertRedirect(route('verification.notice'));
+
+        $this->assertNull($user->refresh()->email_verified_at);
+    }
+
+    public function test_resending_invalidates_the_previous_token(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => null]);
+
+        $first = $user->generateVerificationToken();
+        $second = $user->generateVerificationToken();
+
+        $this->assertNotSame($first, $second);
+
+        // The first link is dead once a new one was generated.
+        $this->get(route('verification.verify', ['token' => $first]))
+            ->assertRedirect(route('verification.notice'));
+
+        $this->get(route('verification.verify', ['token' => $second]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
     public function test_logout_destroys_session(): void

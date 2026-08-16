@@ -51,6 +51,7 @@ class RegisterController extends Controller
 
         session()->flash('status', t('auth.checkEmail'));
 
-        return redirect()->route('dashboard');
+        // Email verification is required before the dashboard can be used.
+        return redirect()->route('verification.notice');
     }
 }

@@ -17,12 +17,12 @@ class VerifyEmailNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $url = $notifiable->verificationUrl();
-
         return (new MailMessage)
             ->subject('['.site_name().'] '.t('auth.verifyEmail'))
-            ->line(t('auth.verifyEmail').' — '.$notifiable->email)
-            ->action(t('auth.verifyEmail'), $url)
-            ->line('If you did not create an account, no further action is required.');
+            ->view('emails.auth.verify', [
+                'siteName' => site_name(),
+                'user' => $notifiable,
+                'url' => $notifiable->verificationUrl(),
+            ]);
     }
 }

@@ -10,7 +10,7 @@ CawStream is a complete, production-ready video hosting platform that runs on a 
 
 | Area | Details |
 |---|---|
-| Auth | Register, login, forgot/reset password, email verification, remember me, rate limiting, roles (`user`/`admin`), first account becomes admin |
+| Auth | Register, login, forgot/reset password, email verification (one-time rotating tokens, 60-min expiry, dashboard locked until verified), remember me, rate limiting, roles (`user`/`admin`), first account becomes admin |
 | Upload | Chunked/resumable upload with progress, real validation with FFprobe, server-side quota (free = 500 MB) |
 | Processing | Queue-based pipeline: probe → thumbnail → transcode to MP4 → optional HLS ladder → ready |
 | Streaming | HTTP Range requests (206), efficient chunked responses, thumbnails, HLS playlists guarded against traversal |
@@ -22,7 +22,7 @@ CawStream is a complete, production-ready video hosting platform that runs on a 
 | Admin | Overview, users, videos, storage, branding (name/logo/favicon/meta), player, SMTP (test mail), system info, logs |
 | Plans | Free / Premium Rp 99.000 / Platinum Rp 199.000 — subscription via Telegram (`t.me/cawsociety`) |
 | i18n | Auto-detected English / Bahasa Indonesia (cookie override) |
-| Installer | CLI `install.sh` (one command) **and** web wizard at `/install` (requirements → database → app → admin → run), locked after install |
+| Installer | CLI `install.sh` (one command, Ubuntu 22.04/24.04 only) **and** web wizard at `/install` (requirements → database → application → SMTP → environment → administrator → install), locked after install |
 
 ## Quick start
 
