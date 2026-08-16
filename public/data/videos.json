@@ -1,0 +1,80 @@
+[
+  {
+    "id": "big-buck-bunny",
+    "title": "Big Buck Bunny",
+    "description": "A giant rabbit with a heart of gold is pushed to the edge by three rodent bullies. Classic Blender open-movie animation, served straight from your own server.",
+    "category": "Animation",
+    "tags": ["blender", "open movie", "family"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+    "src": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    "duration": "9:56",
+    "views": 128400,
+    "featured": true,
+    "uploadedAt": "2026-01-12"
+  },
+  {
+    "id": "sintel",
+    "title": "Sintel",
+    "description": "A lonely young woman finds a baby dragon and sets out on an epic quest across a broken world. Award-winning open movie.",
+    "category": "Fantasy",
+    "tags": ["blender", "open movie", "epic"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg",
+    "src": "https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+    "duration": "14:48",
+    "views": 96400,
+    "featured": true,
+    "uploadedAt": "2026-02-03"
+  },
+  {
+    "id": "tears-of-steel",
+    "title": "Tears of Steel",
+    "description": "In a near-future Amsterdam, a group of scientists and soldiers tries to rewrite history itself. Sci-fi short from the Blender Foundation.",
+    "category": "Sci-Fi",
+    "tags": ["blender", "open movie", "sci-fi"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg",
+    "src": "https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+    "duration": "12:14",
+    "views": 87300,
+    "featured": false,
+    "uploadedAt": "2026-02-18"
+  },
+  {
+    "id": "elephants-dream",
+    "title": "Elephants Dream",
+    "description": "Two men explore a surreal machine-world. The very first Blender open movie — a landmark of open-source filmmaking.",
+    "category": "Sci-Fi",
+    "tags": ["blender", "open movie", "surreal"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg",
+    "src": "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    "duration": "10:53",
+    "views": 61100,
+    "featured": false,
+    "uploadedAt": "2026-03-01"
+  },
+  {
+    "id": "for-bigger-blazes",
+    "title": "For Bigger Blazes",
+    "description": "Chromecast demo reel — short, snappy, and great for testing how your stream performs on any device.",
+    "category": "Comedy",
+    "tags": ["demo", "short"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerBlazes.jpg",
+    "src": "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "duration": "0:15",
+    "views": 45200,
+    "featured": false,
+    "uploadedAt": "2026-03-14"
+  },
+  {
+    "id": "bbb-hls",
+    "title": "Big Buck Bunny (HLS demo)",
+    "description": "The same classic short delivered over an adaptive HLS stream — shows how CawStream plays .m3u8 sources with hls.js, including live-style manifest switching.",
+    "category": "Demo",
+    "tags": ["hls", "adaptive", "demo"],
+    "poster": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+    "src": "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
+    "duration": "9:56",
+    "views": 31900,
+    "featured": false,
+    "uploadedAt": "2026-04-02"
+  }
+]

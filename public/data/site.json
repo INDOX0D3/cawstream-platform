@@ -1,0 +1,13 @@
+{
+  "name": "CawStream",
+  "tagline": "Self-hosted video streaming on your own server. No cloud, no backend.",
+  "adminPasscode": "cawstream-admin",
+  "ad": {
+    "popunderUrl": "https://gigglehiccup.com/fe/9f/73/fe9f733a7316186fd6fca34a57960c4a.js",
+    "popunderEnabled": true,
+    "overlayEnabled": true,
+    "overlayText": "Enjoying CawStream? Please support the site by visiting our sponsor.",
+    "overlayLink": "https://vidood.fun",
+    "enabledPages": ["embed"]
+  }
+}

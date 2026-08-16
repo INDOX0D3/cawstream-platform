@@ -1,67 +1,133 @@
-# CawStream — self-hosted video hosting & streaming
+# CawStream — Self-Hosted Video Streaming
 
-CawStream is a complete, production-ready video hosting platform that runs on a **single Ubuntu VPS**:
+A complete video streaming platform that runs as **plain static files** on a
+single VPS. No Laravel, no PHP, no database, no cloud services — just nginx
+serving a React app, your video files, and a JSON catalog.
 
-- **Stack**: Laravel 12 · Blade · Livewire 3 · Alpine.js · Tailwind CSS 4 · MySQL/MariaDB · FFmpeg/FFprobe · Nginx · PHP-FPM
-- **No third-party backend**: no Convex, no Mux, no Firebase, no Supabase, no external storage, no external database.
-- **Everything local**: uploads, transcoding, thumbnails, HLS, streaming, analytics, ads, watermark, SMTP and storage all run on your own server.
+## Stack
 
-## Feature overview
+```
+Ubuntu 22.04 / 24.04  →  Nginx  →  static React build (Vite)
+                                       ├── /videos/*.mp4, *.webm, *.m3u8
+                                       ├── /data/videos.json   (catalog)
+                                       └── /data/site.json     (site + ads config)
+```
 
-| Area | Details |
-|---|---|
-| Auth | Register, login, forgot/reset password, email verification (one-time rotating tokens, 60-min expiry, dashboard locked until verified), remember me, rate limiting, roles (`user`/`admin`), first account becomes admin |
-| Upload | Chunked/resumable upload with progress, real validation with FFprobe, server-side quota (free = 500 MB) |
-| Processing | Queue-based pipeline: probe → thumbnail → transcode to MP4 → optional HLS ladder → ready |
-| Streaming | HTTP Range requests (206), efficient chunked responses, thumbnails, HLS playlists guarded against traversal |
-| Player | Custom controls (play, seek, volume, speed, quality, PiP, fullscreen), watermark, poster |
-| Watch / Embed | `/v/{id}` public page with meta tags + same-owner related videos, `/e/{id}` minimal embed player |
-| Ads (per user) | Smartlink, popunder, social bar — run **only on embeds**, sandboxed, once-per-session or always |
-| Analytics | Deduplicated views (hashed viewer IDs, once per viewer per day), bot traffic filtered, 13-day charts |
-| Dashboard | Overview stats, My Videos (search/filter/copy links/edit/delete/retry), upload, ads, player, watermark (Premium/Platinum), profile, security |
-| Admin | Overview, users, videos, storage, branding (name/logo/favicon/meta), player, SMTP (test mail), system info, logs |
-| Plans | Free / Premium Rp 99.000 / Platinum Rp 199.000 — subscription via Telegram (`t.me/cawsociety`) |
-| i18n | Auto-detected English / Bahasa Indonesia (cookie override) |
-| Installer | CLI `install.sh` (one command, Ubuntu 22.04/24.04 only) **and** web wizard at `/install` (requirements → database → application → SMTP → environment → administrator → install), locked after install |
+Node.js is only needed on your machine to build the assets. Production runs on
+nginx alone.
 
-## Quick start
+## Features
 
-This repository **is the Laravel application** — `artisan`, `composer.json` and `public/` live at the repo root, so after cloning you can run the installer directly (no subfolder).
+- **Landing / Browse / Watch** pages with search, categories, and sorting
+- **Embed player at `/e/:id`** — autoplays muted, HLS + MP4, never gets stuck
+- **Ads**: gesture-fired popunder and a post-roll end-card, isolated from the
+  player so a broken ad script can never block the play button
+- **Admin panel at `/admin`** — add/edit/delete videos, preview local files,
+  configure site + ads, export/import the JSON catalog
+- **Runtime catalog** — edit `videos.json` on the server, changes apply
+  instantly without rebuilding
+
+## Run locally (development)
 
 ```bash
-# On your Ubuntu 22.04 / 24.04 VPS:
-git clone https://github.com/INDOX0D3/cawstream-platform.git /var/www/cawstream
-cd /var/www/cawstream
-sudo bash install.sh
+npm install
+npm run dev        # http://localhost:5173
 ```
 
-That single command detects Ubuntu, installs Nginx + PHP 8.3 + MariaDB + FFmpeg, writes `.env`, runs migrations, builds assets, creates the admin, configures nginx + systemd worker + cron + HTTPS.
-
-Manual steps are documented in `INSTALL.md` and `DEPLOYMENT.md`; updating an existing install is covered in `UPDATE-VPS.md`.
-
-## Directory layout
-
-```
-app/            Models, Controllers, Jobs, Policies, Services, Livewire, Notifications, Support
-bootstrap/      Laravel bootstrap + providers
-config/         Configuration (cawstream.php, video.php, plans.php, ads.php, ...)
-database/       Migrations + factories + seeders
-deploy/         nginx.conf + supervisor worker conf
-public/         Web root (index.php, storage symlink)
-resources/      Views (Blade), lang (en/id), css, js (Alpine + player)
-routes/         web.php + console.php (artisan commands)
-storage/        Logs, cache, uploads (videos/), branding
-tests/          Feature + unit tests (php artisan test)
-install.sh      One-command Ubuntu installer
-update.sh       git pull + rebuild + migrate + restart
-env.example     Environment template
-```
-
-## Tests
+## Build for production
 
 ```bash
-composer install
-php artisan test
+npm run build      # outputs dist/
 ```
 
-Tests use fake FFmpeg fixtures (`tests/fixtures/bin`) so they run on any machine.
+## Deploy to one VPS (Ubuntu + nginx)
+
+```bash
+# on your machine
+npm run build
+scp -r dist ubuntu@YOUR_VPS:/tmp/vidood-dist
+
+# on the VPS
+sudo mkdir -p /var/www/vidood
+sudo cp -r /tmp/vidood-dist/. /var/www/vidood/
+sudo mkdir -p /var/www/vidood/videos /var/www/vidood/data
+```
+
+Or use the helper (builds on the VPS — Node needed there once):
+
+```bash
+bash deploy/setup-static.sh /path/to/repo vidood.fun
+```
+
+nginx config: `deploy/nginx-cawstream.conf` — SPA fallback
+(`try_files $uri $uri/ /index.html`), range requests for video seeking, long
+cache for hashed assets. Then enable HTTPS:
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d vidood.fun -d www.vidood.fun
+```
+
+## Adding videos
+
+1. Copy files into `/var/www/vidood/videos/` (MP4 / WebM / `.m3u8`).
+2. Open `/admin` (default passcode `cawstream-admin`, change it in the panel).
+3. Add a video entry pointing at `/videos/your-file.mp4`.
+4. **Export `videos.json`** and upload it to `/var/www/vidood/data/videos.json`
+   — or edit that file directly on the server. No rebuild needed.
+
+Each video gets a watch page `/watch/<id>` and an embed player `/e/<id>`:
+
+```html
+<iframe src="https://vidood.fun/e/your-video-id" width="640" height="360"
+  frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
+```
+
+## Ads
+
+Configured in `/data/site.json` (or the **Site & Ads** tab in the admin panel):
+
+```json
+"ad": {
+  "popunderUrl": "https://your-ad-script.com/popunder.js",
+  "popunderEnabled": true,
+  "overlayEnabled": true,
+  "overlayText": "Enjoying CawStream? Visit our sponsor.",
+  "overlayLink": "https://…",
+  "enabledPages": ["embed"]
+}
+```
+
+- The **popunder** is injected into `<head>` on the first real user gesture.
+  It is a separate script tag with no connection to the `<video>` element, so
+  even if the ad script fails, playback keeps working.
+- The **end-card** appears only after the video ends, with a close button — it
+  is never present while the player could be played.
+- Default: ads run on the **embed page only**.
+
+## Project layout
+
+```
+public/
+  data/videos.json      ← video catalog (editable at runtime)
+  data/site.json        ← site + ads config
+  videos/               ← drop your video files here
+src/
+  components/Player.tsx ← robust HLS/MP4 player (muted autoplay, error recovery)
+  components/Layout.tsx
+  components/VideoCard.tsx
+  lib/catalog.ts        ← catalog loader + localStorage admin overlay
+  lib/ads.ts            ← popunder injection (isolated from the player)
+  pages/                ← Landing, Browse, Watch, Embed (/e/:id), Admin
+deploy/
+  nginx-cawstream.conf
+  setup-static.sh
+```
+
+## Notes
+
+- The admin passcode gate is client-side (the app has no backend). It stops
+  casual visitors from editing the catalog — it is not a security boundary.
+  Treat `/data/site.json` as public configuration.
+- Admin edits are kept in your browser (localStorage) until you export the
+  JSON files — that's the "publish" step.

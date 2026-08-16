@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# Fake ffmpeg for automated tests: creates the output file (last argument).
-out="${@: -1}"
-if [ -n "$out" ] && [[ "$out" != -* ]]; then
-  mkdir -p "$(dirname "$out")"
-  touch "$out"
-fi
-exit 0
